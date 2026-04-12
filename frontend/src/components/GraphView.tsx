@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import type { GraphData } from '../types';
+import * as d3 from 'd3';
 
 const COMMUNITY_COLORS: Record<string, string> = {
   tech: '#3b82f6',
@@ -23,6 +24,68 @@ interface Props {
   focusNodeId: string | null;
 }
 
+function computeConcentricPositions(
+  nodeIds: string[],
+  edges: { source: string; target: string }[],
+  centerNodeId: string,
+  width: number,
+  height: number
+): Map<string, { x: number; y: number }> {
+  // Build adjacency
+  const adj = new Map<string, Set<string>>();
+  for (const id of nodeIds) adj.set(id, new Set());
+  for (const e of edges) {
+    adj.get(e.source)?.add(e.target);
+    adj.get(e.target)?.add(e.source);
+  }
+
+  // BFS from center
+  const layer = new Map<string, number>();
+  const queue: string[] = [centerNodeId];
+  layer.set(centerNodeId, 0);
+  let head = 0;
+  while (head < queue.length) {
+    const cur = queue[head++];
+    const curLayer = layer.get(cur)!;
+    for (const nb of (adj.get(cur) ?? [])) {
+      if (!layer.has(nb)) {
+        layer.set(nb, curLayer + 1);
+        queue.push(nb);
+      }
+    }
+  }
+  // Disconnected nodes get a large layer number
+  for (const id of nodeIds) {
+    if (!layer.has(id)) layer.set(id, 999);
+  }
+
+  // Group by layer
+  const groups = new Map<number, string[]>();
+  for (const [id, l] of layer) {
+    if (!groups.has(l)) groups.set(l, []);
+    groups.get(l)!.push(id);
+  }
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const RING = 80;
+  const positions = new Map<string, { x: number; y: number }>();
+
+  for (const [l, ids] of groups) {
+    if (l === 0) {
+      positions.set(centerNodeId, { x: cx, y: cy });
+      continue;
+    }
+    const r = l === 999 ? (Math.max(...Array.from(groups.keys()).filter(k => k < 999)) + 1) * RING + 60 : l * RING;
+    ids.forEach((id, i) => {
+      const angle = (2 * Math.PI * i) / ids.length - Math.PI / 2;
+      positions.set(id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+    });
+  }
+
+  return positions;
+}
+
 export function GraphView({
   graphData,
   activatedSet,
@@ -35,6 +98,7 @@ export function GraphView({
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [layoutMode, setLayoutMode] = useState<'force' | 'concentric'>('force');
   const newSet = new Set(newActivated);
 
   useEffect(() => {
@@ -135,8 +199,44 @@ export function GraphView({
     [activatedSet]
   );
 
+  const getHighestDegreeNode = useCallback((): string => {
+    if (!graphData) return '';
+    const degree = new Map<string, number>();
+    for (const e of graphData.edges) {
+      degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
+      degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
+    }
+    let best = graphData.nodes[0].id;
+    let bestDeg = 0;
+    for (const [id, deg] of degree) {
+      if (deg > bestDeg) { bestDeg = deg; best = id; }
+    }
+    return best;
+  }, [graphData]);
+
+  const applyConcentricLayout = useCallback((centerId: string) => {
+    if (!fgRef.current || !graphData) return;
+    const positions = computeConcentricPositions(
+      graphData.nodes.map((n) => n.id),
+      graphData.edges.map((e) => ({ source: e.source, target: e.target })),
+      centerId,
+      dimensions.width,
+      dimensions.height
+    );
+    fgRef.current.d3Force('x', d3.forceX((d: any) => positions.get(d.id)?.x ?? dimensions.width / 2).strength(1));
+    fgRef.current.d3Force('y', d3.forceY((d: any) => positions.get(d.id)?.y ?? dimensions.height / 2).strength(1));
+    fgRef.current.d3ReheatSimulation();
+  }, [graphData, dimensions]);
+
+  const restoreForceLayout = useCallback(() => {
+    if (!fgRef.current) return;
+    fgRef.current.d3Force('x', null);
+    fgRef.current.d3Force('y', null);
+    fgRef.current.d3ReheatSimulation();
+  }, []);
+
   return (
-    <div ref={containerRef} className="w-full h-full bg-gray-900 overflow-hidden">
+    <div ref={containerRef} className="w-full h-full bg-gray-900 overflow-hidden relative">
       <ForceGraph2D
         ref={fgRef}
         width={dimensions.width}
@@ -161,6 +261,22 @@ export function GraphView({
         backgroundColor="#111827"
         cooldownTicks={100}
       />
+      {graphData && (
+        <button
+          onClick={() => {
+            if (layoutMode === 'force') {
+              setLayoutMode('concentric');
+              applyConcentricLayout(getHighestDegreeNode());
+            } else {
+              setLayoutMode('force');
+              restoreForceLayout();
+            }
+          }}
+          className="absolute top-3 right-3 bg-gray-800/90 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-600 backdrop-blur-sm transition-colors"
+        >
+          {layoutMode === 'force' ? '◎ Concentric' : '⟳ Force'}
+        </button>
+      )}
     </div>
   );
 }
