@@ -1,11 +1,9 @@
 import json
 import os
-import random
 from collections import deque
 from pathlib import Path
 
 import networkx as nx
-import numpy as np
 
 SNAP_DIR = Path(__file__).parent.parent / "data" / "snap"
 
@@ -30,7 +28,7 @@ def _load_edges(data_dir: str | Path) -> nx.Graph:
     return G
 
 
-def _bfs_sample(G: nx.Graph, max_nodes: int, seed: int | None = None) -> nx.Graph:
+def _bfs_sample(G: nx.Graph, max_nodes: int) -> nx.Graph:
     """
     BFS from the highest-degree node, expanding neighbours ordered by degree
     (highest first). Stops when max_nodes is reached.
@@ -48,7 +46,8 @@ def _bfs_sample(G: nx.Graph, max_nodes: int, seed: int | None = None) -> nx.Grap
     while queue and len(visited) < max_nodes:
         node = queue.popleft()
         # Sort neighbours descending by degree so high-influence nodes come first
-        neighbours = sorted(G.neighbors(node), key=lambda n: G.degree(n), reverse=True)
+        # Use secondary key by node ID for stable, deterministic ordering
+        neighbours = sorted(G.neighbors(node), key=lambda n: (G.degree(n), n), reverse=True)
         for nb in neighbours:
             if nb not in visited:
                 visited.add(nb)

@@ -34,13 +34,13 @@ def test_load_edges_ignores_non_edge_files():
 def test_bfs_sample_respects_max_nodes():
     # Star graph: 1 centre connected to 200 leaves
     G = nx.star_graph(200)
-    sampled = _bfs_sample(G, max_nodes=50, seed=42)
+    sampled = _bfs_sample(G, max_nodes=50)
     assert sampled.number_of_nodes() <= 50
 
 
 def test_bfs_sample_returns_connected_subgraph():
     G = nx.barabasi_albert_graph(300, 3, seed=1)
-    sampled = _bfs_sample(G, max_nodes=100, seed=1)
+    sampled = _bfs_sample(G, max_nodes=100)
     assert nx.is_connected(sampled)
 
 
@@ -49,6 +49,6 @@ def test_bfs_sample_prefers_high_degree_nodes():
     G = nx.Graph()
     G.add_edges_from([(0, i) for i in range(1, 50)])   # hub
     G.add_edges_from([(i, 50 + i) for i in range(1, 10)])  # spokes
-    sampled = _bfs_sample(G, max_nodes=20, seed=0)
+    sampled = _bfs_sample(G, max_nodes=20)
     # Hub must be included (highest degree)
     assert 0 in sampled.nodes()
