@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import json
-from twin_builder import _build_layer_b, build_twin
+from twin_builder import _build_layer_b, build_twin, build_all_twins
 from unittest.mock import patch, MagicMock
 
 
@@ -73,3 +73,39 @@ def test_build_twin_uses_layer_b_in_output():
     parsed = json.loads(result)
     assert "behavior" in parsed
     assert parsed["name"] == "Alice Chen"
+
+
+def test_build_all_twins_enriches_kol_nodes():
+    """build_all_twins should add persona to KOL nodes and update their names."""
+    graph_data = {
+        "nodes": [
+            {"id": "n_0", "name": "Original", "type": "kol", "community": "tech influencers",
+             "influence": 0.8, "activity": 0.7, "sentiment": 0.6, "followers": 10000, "persona": None},
+            {"id": "n_1", "name": "Normal", "type": "normal", "community": "tech influencers",
+             "influence": 0.5, "activity": 0.6, "sentiment": 0.5, "followers": 100, "persona": None},
+        ],
+        "edges": [
+            {"source": "n_0", "target": "n_1", "weight": 0.8, "type": "follow"}
+        ]
+    }
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=json.dumps({
+        "name": "Tech Expert",
+        "bio": "Leading tech voice.",
+        "topics": ["AI", "tech"],
+        "tone": "analytical",
+        "posting_frequency": "high",
+        "brand_sensitivity": 0.7,
+        "behavior": {"bridge_role": False, "community_loyal": True,
+                     "engagement_bias": "high", "content_filters": []},
+    }))]
+    with patch("twin_builder._client") as mock_client:
+        mock_client.messages.create.return_value = mock_response
+        result = build_all_twins(graph_data)
+
+    kol = result["nodes"][0]
+    normal = result["nodes"][1]
+    assert kol["persona"] is not None
+    assert json.loads(kol["persona"])["name"] == "Tech Expert"
+    assert kol["name"] == "Tech Expert"          # name updated
+    assert normal["persona"] is None              # normal node untouched

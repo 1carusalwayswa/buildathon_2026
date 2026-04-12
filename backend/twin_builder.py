@@ -116,9 +116,13 @@ def build_all_twins(graph_data: dict) -> dict:
     # Rebuild graph for centrality metrics (needed for Layer B)
     G = nx.Graph()
     for edge in graph_data["edges"]:
-        u = int(edge["source"].replace("n_", ""))
-        v = int(edge["target"].replace("n_", ""))
-        G.add_edge(u, v)
+        try:
+            u = int(edge["source"].replace("n_", ""))
+            v = int(edge["target"].replace("n_", ""))
+            G.add_edge(u, v)
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            print(f"[twin_builder] WARNING: skipping malformed edge {edge}: {e}")
+            continue
 
     betweenness = nx.betweenness_centrality(G, normalized=True)
     clustering = nx.clustering(G)
@@ -128,7 +132,11 @@ def build_all_twins(graph_data: dict) -> dict:
         if node["type"] != "kol":
             continue
 
-        nid = int(node["id"].replace("n_", ""))
+        try:
+            nid = int(node["id"].replace("n_", ""))
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            print(f"[twin_builder] WARNING: skipping KOL node with invalid ID {node.get('id')}: {e}")
+            continue
         degree = G.degree(nid) if G.has_node(nid) else 0
 
         twin_json = build_twin(
