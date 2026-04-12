@@ -136,7 +136,10 @@ export function InvestPanel({
 
       {canCompare && (
         <button
-          onClick={() => onCompare(savedScenarios)}
+          onClick={() => {
+            onCompare(savedScenarios);
+            setSavedScenarios([]);
+          }}
           className="bg-purple-600 hover:bg-purple-500 text-white rounded px-4 py-2 text-sm font-semibold transition-colors"
         >
           Compare Scenarios

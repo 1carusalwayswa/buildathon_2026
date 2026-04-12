@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { GraphData, SimResult, SimRequest, AgentDecision, CompareResult } from './types';
-import { fetchGraph, runSimulation, compareSimulations } from './api/client';
+import { fetchGraph, runSimulation } from './api/client';
 import { GraphView } from './components/GraphView';
 import { SimulationPlayer } from './components/SimulationPlayer';
 import { InvestPanel } from './components/InvestPanel';
@@ -84,16 +84,11 @@ export default function App() {
     setLayer('nodeDetail');
   }, []);
 
-  const handleCompare = useCallback(async (scenarios: SavedScenario[]) => {
-    try {
-      const result = await compareSimulations({
-        scenarios: scenarios.map((s) => s.req),
-        scenario_names: scenarios.map((s) => s.name),
-      });
-      setCompareResult(result);
-    } catch (e: any) {
-      setError(e.message);
-    }
+  const handleCompare = useCallback((scenarios: SavedScenario[]) => {
+    setCompareResult({
+      results: scenarios.map((s) => s.result),
+      names: scenarios.map((s) => s.name),
+    });
   }, []);
 
   return (

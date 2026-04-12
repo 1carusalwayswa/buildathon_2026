@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import type { GraphData } from '../types';
 import * as d3 from 'd3';
@@ -76,7 +76,9 @@ function computeConcentricPositions(
       positions.set(centerNodeId, { x: cx, y: cy });
       continue;
     }
-    const r = l === 999 ? (Math.max(...Array.from(groups.keys()).filter(k => k < 999)) + 1) * RING + 60 : l * RING;
+    const nonOuterLayers = Array.from(groups.keys()).filter(k => k < 999);
+    const maxLayer = nonOuterLayers.length > 0 ? Math.max(...nonOuterLayers) : 1;
+    const r = l === 999 ? (maxLayer + 1) * RING + 60 : l * RING;
     ids.forEach((id, i) => {
       const angle = (2 * Math.PI * i) / ids.length - Math.PI / 2;
       positions.set(id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
@@ -100,7 +102,7 @@ export function GraphView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [layoutMode, setLayoutMode] = useState<'force' | 'concentric'>('force');
-  const newSet = new Set(newActivated);
+  const newSet = useMemo(() => new Set(newActivated), [newActivated]);
 
   useEffect(() => {
     if (!containerRef.current) return;
