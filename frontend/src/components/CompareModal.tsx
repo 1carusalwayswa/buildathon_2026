@@ -48,7 +48,10 @@ export function CompareModal({ result, onClose }: Props) {
     },
   ];
 
-  const winner = a.analytics.coverage >= b.analytics.coverage ? nameA : nameB;
+  const winner =
+    a.analytics.coverage > b.analytics.coverage ? nameA :
+    b.analytics.coverage > a.analytics.coverage ? nameB :
+    null;
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -85,7 +88,10 @@ export function CompareModal({ result, onClose }: Props) {
           {/* Community penetration comparison */}
           <div className="mt-4">
             <div className="text-gray-400 text-xs mb-2">Community Penetration</div>
-            {Object.keys(a.analytics.community_penetration).map((comm) => {
+            {Array.from(new Set([
+              ...Object.keys(a.analytics.community_penetration),
+              ...Object.keys(b.analytics.community_penetration),
+            ])).map((comm) => {
               const pctA = a.analytics.community_penetration[comm] ?? 0;
               const pctB = b.analytics.community_penetration[comm] ?? 0;
               return (
@@ -115,7 +121,9 @@ export function CompareModal({ result, onClose }: Props) {
           <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3">
             <div className="text-green-400 text-xs font-semibold">Recommendation</div>
             <div className="text-gray-300 text-sm mt-0.5">
-              <span className="text-white font-semibold">{winner}</span> achieves higher coverage. Prefer this scenario.
+              {winner
+                ? <><span className="text-white font-semibold">{winner}</span> achieves higher coverage. Prefer this scenario.</>
+                : 'Both scenarios achieve equal coverage.'}
             </div>
           </div>
         </div>
