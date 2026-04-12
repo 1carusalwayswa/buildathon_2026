@@ -94,6 +94,7 @@ export function GraphView({
   onNodeClick,
   isPlaying,
   bottleneckSet,
+  focusNodeId,
 }: Props) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,6 +111,16 @@ export function GraphView({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!graphData) return;
+    if (focusNodeId) {
+      applyConcentricLayout(focusNodeId);
+    } else if (layoutMode === 'force') {
+      restoreForceLayout();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNodeId, graphData]);
 
   const graphForce = graphData
     ? {
