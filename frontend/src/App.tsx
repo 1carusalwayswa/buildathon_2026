@@ -26,21 +26,27 @@ export default function App() {
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
 
   const simState = useSimulationState(simResult);
+  const { reset: resetSimulation } = simState;
 
   const currentActivated = simState.activatedAtStep.size;
   const totalNodes = graphData?.nodes.length ?? 0;
 
-  // Collect all agent decisions across entire simulation (not step-gated)
-  const allDecisions: Record<string, AgentDecision> = {};
-  if (simResult) {
-    for (const step of simResult.steps) {
-      for (const d of step.agent_decisions ?? []) {
-        allDecisions[d.node_id] = d;
+  const allDecisions = useMemo(() => {
+    const decisions: Record<string, AgentDecision> = {};
+    if (simResult) {
+      for (const step of simResult.steps) {
+        for (const d of step.agent_decisions ?? []) {
+          decisions[d.node_id] = d;
+        }
       }
     }
-  }
+    return decisions;
+  }, [simResult]);
 
-  const selectedNode = graphData?.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  const selectedNode = useMemo(
+    () => graphData?.nodes.find((n) => n.id === selectedNodeId) ?? null,
+    [graphData, selectedNodeId]
+  );
   const selectedDecision = selectedNodeId ? allDecisions[selectedNodeId] ?? null : null;
 
   const bottleneckSet = useMemo(
@@ -71,13 +77,13 @@ export default function App() {
     try {
       const result = await runSimulation(req);
       setSimResult(result);
-      simState.reset();
+      resetSimulation();
     } catch (e: any) {
       setError(e.message);
     } finally {
       setIsSimulating(false);
     }
-  }, [simState]);
+  }, [resetSimulation]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
@@ -92,25 +98,38 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-void text-fore overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+      <div className="relative flex items-center justify-between px-4 py-2 bg-surface border-b border-edge flex-shrink-0">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-sig/50 to-transparent" />
         <div className="flex items-center gap-3">
-          <h1 className="text-white font-bold text-lg">SocialSim</h1>
-          <span className="text-gray-500 text-sm">Influence Network Simulator</span>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-sig/10 border border-sig/35 flex items-center justify-center flex-shrink-0">
+              <span className="text-sig text-xs font-bold font-mono">S</span>
+            </div>
+            <span className="text-fore font-bold text-sm tracking-wider">
+              SOCIAL<span className="text-sig">SIM</span>
+            </span>
+          </div>
+          <div className="w-px h-4 bg-edge-hi" />
+          <span className="text-dim text-xs tracking-widest uppercase font-mono">Influence Network Simulator</span>
         </div>
-        <div className="flex items-center gap-2">
-          {error && <span className="text-red-400 text-xs">{error}</span>}
+        <div className="flex items-center gap-3">
+          {error && (
+            <span className="text-risk text-xs bg-risk/10 border border-risk/30 rounded px-2 py-0.5">
+              {error}
+            </span>
+          )}
           <button
             onClick={handleLoadGraph}
             disabled={isLoadingGraph}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white rounded px-3 py-1.5 text-sm font-medium"
+            className="btn-sig px-3 py-1.5 text-xs font-bold tracking-widest"
           >
-            {isLoadingGraph ? 'Loading...' : graphData ? 'Reload Graph' : 'Load Graph'}
+            {isLoadingGraph ? 'LOADING...' : graphData ? 'RELOAD GRAPH' : 'LOAD GRAPH'}
           </button>
           {graphData && (
-            <span className="text-gray-500 text-xs">
-              {graphData.nodes.length} nodes · {graphData.edges.length} edges
+            <span className="text-ghost text-xs font-mono">
+              {graphData.nodes.length}N · {graphData.edges.length}E
             </span>
           )}
         </div>
@@ -133,27 +152,44 @@ export default function App() {
           {!graphData && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-gray-500 text-lg mb-2">No network loaded</div>
-                <div className="text-gray-600 text-sm">Click "Load Graph" to generate a BA network</div>
+                <div
+                  className="w-20 h-20 mx-auto mb-5 rounded-full border border-edge-hi flex items-center justify-center"
+                  style={{ background: 'radial-gradient(circle at center, rgba(0,212,255,0.06), transparent 70%)' }}
+                >
+                  <span className="text-sig/40 text-3xl">◎</span>
+                </div>
+                <div className="text-mid text-sm font-semibold mb-1 tracking-wide">No network loaded</div>
+                <div className="text-ghost text-xs">
+                  Click <span className="text-sig font-mono">LOAD GRAPH</span> to generate a BA network
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Right Panel */}
-        <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col overflow-y-auto">
+        <div className="w-80 bg-surface border-l border-edge flex flex-col overflow-y-auto">
           <div className="p-3 flex flex-col gap-4">
-            {/* Layer navigation breadcrumb */}
+            {/* Breadcrumb */}
             {layer !== 'global' && (
-              <div className="flex items-center gap-1 text-xs">
-                <button onClick={() => setLayer('global')} className="text-blue-400 hover:text-blue-300">Global</button>
-                {layer === 'nodeDetail' && <><span className="text-gray-600">›</span><span className="text-gray-300">Node Detail</span></>}
+              <div className="flex items-center gap-1.5 text-xs font-mono">
+                <button onClick={() => setLayer('global')} className="text-sig hover:text-sig/70 transition-colors">
+                  GLOBAL
+                </button>
+                {layer === 'nodeDetail' && (
+                  <>
+                    <span className="text-ghost">›</span>
+                    <span className="text-mid">NODE DETAIL</span>
+                  </>
+                )}
                 {layer === 'agentDetail' && (
                   <>
-                    <span className="text-gray-600">›</span>
-                    <button onClick={() => setLayer('nodeDetail')} className="text-blue-400 hover:text-blue-300">Node Detail</button>
-                    <span className="text-gray-600">›</span>
-                    <span className="text-gray-300">Agent Decision</span>
+                    <span className="text-ghost">›</span>
+                    <button onClick={() => setLayer('nodeDetail')} className="text-sig hover:text-sig/70 transition-colors">
+                      NODE DETAIL
+                    </button>
+                    <span className="text-ghost">›</span>
+                    <span className="text-mid">AGENT DECISION</span>
                   </>
                 )}
               </div>
@@ -170,6 +206,7 @@ export default function App() {
                   lastResult={simResult}
                   onCompare={handleCompare}
                 />
+                <div className="h-px bg-gradient-to-r from-transparent via-edge-hi to-transparent" />
                 <AnalyticsPanel
                   analytics={simResult?.analytics ?? null}
                   currentActivated={currentActivated}
@@ -177,6 +214,7 @@ export default function App() {
                   graphNodes={graphData?.nodes ?? []}
                   onNodeSelect={(nodeId) => { setSelectedNodeId(nodeId); setLayer('nodeDetail'); }}
                 />
+                <div className="h-px bg-gradient-to-r from-transparent via-edge-hi to-transparent" />
                 <ROIRanking analytics={simResult?.analytics ?? null} graphData={graphData} />
               </>
             )}
@@ -203,7 +241,7 @@ export default function App() {
       </div>
 
       {/* Bottom: Simulation Player */}
-      <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 flex-shrink-0">
+      <div className="px-4 py-2 bg-surface border-t border-edge flex-shrink-0">
         <SimulationPlayer state={simState} />
       </div>
 

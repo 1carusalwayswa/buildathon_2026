@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { SimResult } from '../types';
 
 export type PlaybackSpeed = 0.5 | 1 | 2;
@@ -25,13 +25,19 @@ export function useSimulationState(simResult: SimResult | null): SimulationState
 
   const totalSteps = simResult ? simResult.steps.length - 1 : 0;
 
-  const activatedAtStep = simResult
-    ? new Set(simResult.steps[currentStep]?.activated ?? [])
-    : new Set<string>();
+  const activatedAtStep = useMemo(
+    () => simResult
+      ? new Set<string>(simResult.steps[currentStep]?.activated ?? [])
+      : new Set<string>(),
+    [simResult, currentStep]
+  );
 
-  const newAtStep = simResult
-    ? simResult.steps[currentStep]?.new_activated ?? []
-    : [];
+  const newAtStep = useMemo(
+    () => simResult
+      ? simResult.steps[currentStep]?.new_activated ?? []
+      : [],
+    [simResult, currentStep]
+  );
 
   const pause = useCallback(() => {
     setIsPlaying(false);
@@ -39,7 +45,10 @@ export function useSimulationState(simResult: SimResult | null): SimulationState
   }, []);
 
   const play = useCallback(() => {
-    if (!simResult || currentStep >= totalSteps) return;
+    if (!simResult) return;
+    if (currentStep >= totalSteps) {
+      setCurrentStep(0);
+    }
     setIsPlaying(true);
   }, [simResult, currentStep, totalSteps]);
 

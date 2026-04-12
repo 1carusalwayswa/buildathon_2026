@@ -21,9 +21,10 @@ SocialSim 是一个**社交网络影响力传播模拟器**，面向企业营销
 | 后端框架 | Python 3.12, FastAPI |
 | 网络算法 | NetworkX（BA 图生成、社区划分） |
 | LLM | Anthropic Claude API（`claude-haiku-4-5-20251001`） |
-| 前端框架 | React 18, TypeScript, Vite |
+| 前端框架 | React 19, TypeScript, Vite 8 |
 | 图可视化 | react-force-graph-2d（力导向） + D3.js（同心圆布局） |
-| 样式 | Tailwind CSS |
+| 样式 | Tailwind CSS v4，自定义设计系统（Signal Intelligence 主题） |
+| 字体 | Syne（UI）+ JetBrains Mono（数据显示），Google Fonts |
 | 通信 | REST API，前端通过 `/api` 代理到后端 |
 
 ---
@@ -102,7 +103,7 @@ npm run dev
 
 ### GET `/graph`
 
-生成并返回网络图数据。后端缓存最近一次生成的图，供后续模拟使用。
+生成并返回网络图数据。后端为每次调用分配唯一 `graph_id`，缓存在内存中供后续模拟使用。
 
 **查询参数**
 
@@ -112,8 +113,9 @@ npm run dev
 | `n_kol` | int | 15 | KOL 数量（度数最高的节点） |
 | `m_edges` | int | 3 | BA 模型每步连边数 |
 | `n_communities` | int | 5 | 社区数量 |
+| `seed` | int? | null | 随机种子（为 null 时每次生成不同图） |
 
-**返回** `GraphData`：包含 `nodes[]` 和 `edges[]`
+**返回** `GraphData`：包含 `nodes[]`、`edges[]` 和 `graph_id`（UUID）
 
 ---
 
@@ -128,9 +130,12 @@ npm run dev
   "seed_nodes": ["n_1", "n_5"],
   "brand_name": "TechBrand X",
   "brand_content": "革命性的 AI 助手，重新定义生产力",
-  "n_steps": 20
+  "n_steps": 20,
+  "graph_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+`graph_id` 可选，未传时使用最近一次生成的图。
 
 **返回** `SimResult`：
 
@@ -271,12 +276,63 @@ npm run dev
 
 ### 已实现的视觉/交互特性
 
-1. **节点差异化渲染**：KOL 节点带金色光晕，瓶颈节点带橙色虚线圈，选中节点白色高亮
-2. **动态激活动画**：按时间步逐步点亮节点，边上绿色粒子流动
+1. **节点差异化渲染**：KOL 节点带金色（`#f5a623`）光晕，瓶颈节点带橙色虚线圈，选中节点白色高亮
+2. **动态激活动画**：按时间步逐步点亮节点（霓虹绿 `#00ff9d`），边上绿色粒子流动
 3. **双布局切换**：力导向（全局）↔ 同心圆（节点中心），切换时平滑过渡
 4. **方案保存对比**：最多保存 2 个方案，弹窗对比覆盖率、渗透率等指标，附差异百分比标注
 5. **ResizeObserver 响应式画布**：监测容器实际尺寸，避免 canvas 覆盖右侧面板（BUG-1 修复）
 6. **全量决策收集**：从所有步骤收集 KOL 决策，不受当前播放进度限制（BUG-3 修复）
+
+### 设计系统 — Signal Intelligence 主题
+
+前端采用"信号情报中心"视觉语言，区别于通用深色仪表盘。
+
+**色彩 Token（`index.css` `@theme` 定义）**
+
+| Token | 颜色值 | 语义 |
+|-------|--------|------|
+| `void` | `#040d1a` | 主背景（深空黑） |
+| `surface` | `#071428` | 面板背景 |
+| `card` | `#0c1e3a` | 卡片背景 |
+| `edge` | `#142444` | 默认边框 |
+| `edge-hi` | `#1e3460` | 强调边框 |
+| `fore` | `#e2f0ff` | 主文本（冷白） |
+| `mid` | `#8aa8c4` | 次级文本 |
+| `dim` | `#5a7a9a` | 标签/说明 |
+| `ghost` | `#3a5470` | 占位/禁用 |
+| `sig` | `#00d4ff` | 信号青（主强调） |
+| `neon` | `#00ff9d` | 霓虹绿（激活/成功） |
+| `gold` | `#f5a623` | 金色（KOL/权威） |
+| `ai` | `#9945ff` | AI 紫（Agent 决策） |
+| `risk` | `#ff3d71` | 风险红（错误/危险） |
+| `orange` | `#ff8c42` | 橙色（瓶颈节点） |
+
+**按钮体系（`index.css` 自定义类）**
+
+| 类名 | 用途 | 样式特征 |
+|------|------|---------|
+| `btn-sig` | 主操作（加载图谱） | 青色边框 + hover 辉光 |
+| `btn-neon` | 运行/确认操作 | 霓虹绿边框 + hover 辉光 |
+| `btn-ai` | AI 相关操作 | 紫色边框 + hover 辉光 |
+| `btn-ghost` | 次要操作 | 暗色边框，hover 时轻微提亮 |
+| `btn-ghost-active` | 选中状态（速度按钮） | 青色边框无辉光 |
+
+**字体**
+
+- **Syne** — 全局 UI 字体，几何感现代风格
+- **JetBrains Mono** — 所有数值、ID、状态码，通过 `font-mono` class 应用
+
+**图谱节点颜色**
+
+| 社区 | 颜色 |
+|------|------|
+| tech | `#38bdf8`（亮蓝） |
+| fashion | `#f472b6`（粉红） |
+| finance | `#fbbf24`（亮琥珀） |
+| food | `#34d399`（翠绿） |
+| sports | `#a78bfa`（淡紫） |
+| 新激活 | `#00ff9d`（霓虹绿） |
+| 已激活 | `#4dffc4`（浅霓虹绿） |
 
 ---
 
@@ -294,9 +350,9 @@ P(激活) = edge_weight × influence × activity × sentiment
 - 新激活的节点在**下一时间步**才参与传播（BFS 分层）
 - 无新激活节点时模拟提前终止
 
-### KOL 节点 — Claude API Agent
+### KOL 节点 — Claude API Agent（并行调用）
 
-当普通节点的传播到达 KOL 节点时，调用 `claude-haiku-4-5-20251001` 做决策：
+当普通节点的传播到达 KOL 节点时，调用 `claude-haiku-4-5-20251001` 做决策。同一时间步内的多个 KOL 使用 `ThreadPoolExecutor` **并行调用**，将模拟时间从 O(n_kol) 压缩至 O(1)（约 30s → 3s）：
 
 **输入（user message）**
 
@@ -376,8 +432,9 @@ buildathon_2026/
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `ANTHROPIC_API_KEY` | 是 | Claude API 密钥，用于 KOL Agent 决策 |
+| `VITE_API_BASE` | 否 | 前端 API 基础路径，默认 `/api`（通过 Vite 代理到后端） |
 
-前端无需额外环境变量，`/api` 代理在 `vite.config.ts` 中配置，指向 `http://localhost:8001`。
+开发环境下 `VITE_API_BASE` 无需设置，`/api` 代理在 `vite.config.ts` 中配置，指向 `http://localhost:8001`。
 
 ### 常见问题
 
@@ -414,3 +471,15 @@ Claude 有时返回 ` ```json ... ``` ` 包裹的响应，`json.loads` 在第一
 **Q: LLM 调用成本控制**
 
 Agent 决策仅在 KOL 节点（约 15 个）被激活时触发，且每个 KOL 在整次模拟中只决策一次（`agent_decision_map` 缓存）。
+
+---
+
+**Q: 模拟运行超时**
+
+前端 API 客户端对 `/simulate` 设置 90s 超时（并行化后通常 3s 内完成），`/graph` 设置 15s 超时。超时时 fetch 自动 abort，前端显示错误提示。
+
+---
+
+**Q: 每次加载的图都一样**
+
+`GET /graph` 不传 `seed` 参数时使用随机种子，每次生成不同拓扑。如需复现特定图，传 `?seed=42`。

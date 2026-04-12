@@ -1,6 +1,21 @@
-import type { GraphData, SimRequest, SimResult, NodeDetailResponse, CompareRequest, CompareResult } from '../types';
+import type { GraphData, SimRequest, SimResult, CompareResult } from '../types';
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_BASE ?? '/api';
+
+// 工具函数：带超时的 fetch（不导出，内部使用）
+function fetchWithTimeout(url: string, options: RequestInit & { timeoutMs?: number } = {}) {
+  const { timeoutMs = 30000, signal: externalSignal, ...rest } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (externalSignal) {
+    externalSignal.addEventListener('abort', () => controller.abort());
+  }
+
+  return fetch(url, { ...rest, signal: controller.signal }).finally(() =>
+    clearTimeout(timeoutId)
+  );
+}
 
 export async function fetchGraph(params?: {
   n_nodes?: number;
@@ -13,33 +28,19 @@ export async function fetchGraph(params?: {
       Object.entries(params ?? {}).map(([k, v]) => [k, String(v)])
     )
   ).toString();
-  const res = await fetch(`${BASE}/graph${query ? '?' + query : ''}`);
+  const res = await fetchWithTimeout(`${BASE}/graph${query ? '?' + query : ''}`, { timeoutMs: 15000 });
   if (!res.ok) throw new Error(`/graph failed: ${res.statusText}`);
-  return res.json();
+  return res.json() as Promise<GraphData>;
 }
 
-export async function runSimulation(req: SimRequest): Promise<SimResult> {
-  const res = await fetch(`${BASE}/simulate`, {
+export async function runSimulation(req: SimRequest, signal?: AbortSignal): Promise<SimResult> {
+  const res = await fetchWithTimeout(`${BASE}/simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
+    timeoutMs: 90000,
+    signal,
   });
   if (!res.ok) throw new Error(`/simulate failed: ${res.statusText}`);
-  return res.json();
-}
-
-export async function fetchNodeDetail(nodeId: string): Promise<NodeDetailResponse> {
-  const res = await fetch(`${BASE}/node/${nodeId}`);
-  if (!res.ok) throw new Error(`/node/${nodeId} failed: ${res.statusText}`);
-  return res.json();
-}
-
-export async function compareSimulations(req: CompareRequest): Promise<CompareResult> {
-  const res = await fetch(`${BASE}/simulate/compare`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok) throw new Error(`/simulate/compare failed: ${res.statusText}`);
-  return res.json();
+  return res.json() as Promise<SimResult>;
 }

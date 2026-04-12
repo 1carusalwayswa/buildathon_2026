@@ -27,11 +27,13 @@ def generate_graph(
     n_kol: int = 15,
     m_edges: int = 3,
     n_communities: int = 5,
+    seed: int | None = None,
 ) -> dict:
-    random.seed(42)
-    np.random.seed(42)
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
 
-    G = nx.barabasi_albert_graph(n_nodes, m_edges, seed=42)
+    G = nx.barabasi_albert_graph(n_nodes, m_edges, seed=seed)
 
     # Top n_kol nodes by degree become KOLs
     degree_sorted = sorted(G.degree(), key=lambda x: x[1], reverse=True)

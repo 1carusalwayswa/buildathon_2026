@@ -1,8 +1,10 @@
 import os
+import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from typing import Optional
 from models import (
     GraphData, Node, Edge, SimRequest, SimResult, SimStep,
     AgentDecision, ReasoningStep, Analytics, NodeContribution,
@@ -24,31 +26,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_cached_graph: dict | None = None
+_graph_cache: dict[str, dict] = {}
+_last_graph_id: Optional[str] = None
 
 
-@app.get("/graph", response_model=GraphData)
+@app.get("/graph")
 def get_graph(
     n_nodes: int = 500,
     n_kol: int = 15,
     m_edges: int = 3,
     n_communities: int = 5,
+    seed: Optional[int] = None,
 ):
-    global _cached_graph
-    _cached_graph = generate_graph(n_nodes, n_kol, m_edges, n_communities)
-    return GraphData(
-        nodes=[Node(**n) for n in _cached_graph["nodes"]],
-        edges=[Edge(**e) for e in _cached_graph["edges"]],
-    )
+    global _last_graph_id
+    graph_id = str(uuid.uuid4())
+    graph_data = generate_graph(n_nodes, n_kol, m_edges, n_communities, seed=seed)
+    _graph_cache[graph_id] = graph_data
+    _last_graph_id = graph_id
+    return {
+        "graph_id": graph_id,
+        "nodes": [Node(**n) for n in graph_data["nodes"]],
+        "edges": [Edge(**e) for e in graph_data["edges"]],
+    }
 
 
 @app.post("/simulate", response_model=SimResult)
 def simulate(req: SimRequest):
-    if _cached_graph is None:
+    if req.graph_id is not None:
+        if req.graph_id not in _graph_cache:
+            raise HTTPException(status_code=400, detail=f"graph_id '{req.graph_id}' not found")
+        graph = _graph_cache[req.graph_id]
+    elif _last_graph_id is not None:
+        graph = _graph_cache[_last_graph_id]
+    else:
         raise HTTPException(status_code=400, detail="Call GET /graph first")
 
-    nodes = _cached_graph["nodes"]
-    edges = _cached_graph["edges"]
+    nodes = graph["nodes"]
+    edges = graph["edges"]
 
     node_ids = {n["id"] for n in nodes}
     for seed in req.seed_nodes:
@@ -99,17 +113,18 @@ def simulate(req: SimRequest):
 
 @app.get("/node/{node_id}", response_model=NodeDetailResponse)
 def get_node_detail(node_id: str):
-    if _cached_graph is None:
+    if _last_graph_id is None:
         raise HTTPException(status_code=400, detail="Call GET /graph first")
 
-    node_map = {n["id"]: n for n in _cached_graph["nodes"]}
+    graph = _graph_cache[_last_graph_id]
+    node_map = {n["id"]: n for n in graph["nodes"]}
     if node_id not in node_map:
         raise HTTPException(status_code=404, detail="Node not found")
 
     from collections import defaultdict
     adjacency: dict[str, list[str]] = defaultdict(list)
     node_edges = []
-    for edge in _cached_graph["edges"]:
+    for edge in graph["edges"]:
         adjacency[edge["source"]].append(edge["target"])
         adjacency[edge["target"]].append(edge["source"])
         if edge["source"] == node_id or edge["target"] == node_id:
@@ -134,7 +149,7 @@ def get_node_detail(node_id: str):
 
 @app.post("/simulate/compare", response_model=CompareResult)
 def compare_simulations(req: CompareRequest):
-    if _cached_graph is None:
+    if _last_graph_id is None:
         raise HTTPException(status_code=400, detail="Call GET /graph first")
 
     results = []

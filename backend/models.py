@@ -31,6 +31,7 @@ class SimRequest(BaseModel):
     brand_name: str
     brand_content: str
     n_steps: int = 20
+    graph_id: Optional[str] = None
 
 
 class ReasoningStep(BaseModel):

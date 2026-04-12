@@ -1,4 +1,5 @@
 import random
+import concurrent.futures
 from agent import get_kol_decision
 
 
@@ -40,13 +41,18 @@ def run_simulation(
         # Current frontier: nodes activated in previous step
         prev_new = steps[-1]["new_activated"]
 
-        for activator_id in prev_new:
-            activator = node_map[activator_id]
+        # Collect KOLs needing decisions this step, then call them in parallel
+        kols_to_decide = [
+            activator_id for activator_id in prev_new
+            if node_map[activator_id]["type"] == "kol" and activator_id not in agent_decision_map
+        ]
 
-            # If activator is KOL and hasn't decided yet
-            if activator["type"] == "kol" and activator_id not in agent_decision_map:
-                avg_sentiment = sum(node_map[n]["sentiment"] for n in activated) / len(activated)
-                decision = get_kol_decision(
+        if kols_to_decide:
+            avg_sentiment = sum(node_map[n]["sentiment"] for n in activated) / len(activated)
+
+            def call_kol(activator_id: str) -> dict:
+                activator = node_map[activator_id]
+                return get_kol_decision(
                     activator_id,
                     activator.get("persona", ""),
                     activator["community"],
@@ -54,8 +60,23 @@ def run_simulation(
                     brand_content,
                     avg_sentiment,
                 )
-                agent_decision_map[activator_id] = decision
-                agent_decisions.append(decision)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(kols_to_decide)) as executor:
+                futures = {executor.submit(call_kol, aid): aid for aid in kols_to_decide}
+                for future in concurrent.futures.as_completed(futures):
+                    decision = future.result()
+                    agent_decision_map[decision["node_id"]] = decision
+
+        decisions_added: set[str] = set()
+        for activator_id in prev_new:
+            activator = node_map[activator_id]
+
+            # If activator is KOL and has a decision
+            if activator["type"] == "kol" and activator_id in agent_decision_map:
+                decision = agent_decision_map[activator_id]
+                if activator_id not in decisions_added:
+                    agent_decisions.append(decision)
+                    decisions_added.add(activator_id)
 
                 # KOL spread probability
                 if decision["action"] == "repost":

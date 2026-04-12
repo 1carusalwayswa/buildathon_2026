@@ -11,13 +11,23 @@ function DiffBadge({ a, b, higherIsBetter = true }: { a: number; b: number; high
   const positive = higherIsBetter ? diff > 0 : diff < 0;
   const sign = diff > 0 ? '+' : '';
   return (
-    <span className={`text-xs ml-1 font-medium ${positive ? 'text-green-400' : 'text-red-400'}`}>
+    <span className={`text-xs ml-1 font-mono font-semibold ${positive ? 'text-neon' : 'text-risk'}`}>
       {sign}{(diff * 100).toFixed(1)}%
     </span>
   );
 }
 
 export function CompareModal({ result, onClose }: Props) {
+  if (result.results.length < 2) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+        <div className="bg-surface rounded-lg p-8 text-center">
+          <p className="text-mid">需要至少两个场景才能比较</p>
+          <button onClick={onClose} className="btn-ghost mt-4">关闭</button>
+        </div>
+      </div>
+    );
+  }
   const [a, b] = result.results;
   const [nameA, nameB] = result.names;
 
@@ -54,40 +64,42 @@ export function CompareModal({ result, onClose }: Props) {
     null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
-          <h2 className="text-white font-bold text-base">Scenario Comparison</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+    <div className="fixed inset-0 bg-void/85 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-surface rounded border border-edge w-full max-w-lg shadow-2xl">
+        {/* Modal header */}
+        <div className="relative flex items-center justify-between px-5 py-3 border-b border-edge">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ai/50 to-transparent" />
+          <h2 className="text-fore font-bold text-xs tracking-widest uppercase">Scenario Comparison</h2>
+          <button onClick={onClose} className="text-ghost hover:text-mid text-xl leading-none transition-colors">×</button>
         </div>
 
         <div className="p-5">
-          {/* Header row */}
-          <div className="grid grid-cols-3 gap-3 mb-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
-            <div>Metric</div>
-            <div className="text-center text-blue-400">{nameA}</div>
-            <div className="text-center text-purple-400">{nameB}</div>
+          {/* Column headers */}
+          <div className="grid grid-cols-3 gap-3 mb-3 text-xs font-mono font-semibold uppercase tracking-widest">
+            <div className="text-ghost">Metric</div>
+            <div className="text-center text-sig">{nameA}</div>
+            <div className="text-center text-ai">{nameB}</div>
           </div>
 
           {/* Metric rows */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {metricRows.map((row) => (
-              <div key={row.label} className="grid grid-cols-3 gap-3 bg-gray-700/50 rounded px-3 py-2">
-                <div className="text-gray-400 text-xs self-center">{row.label}</div>
+              <div key={row.label} className="grid grid-cols-3 gap-3 bg-card border border-edge rounded px-3 py-2">
+                <div className="text-dim text-xs self-center font-mono">{row.label}</div>
                 <div className="text-center">
-                  <span className="text-white font-bold text-sm">{row.valA}</span>
+                  <span className="text-fore font-bold text-sm font-mono">{row.valA}</span>
                 </div>
                 <div className="text-center">
-                  <span className="text-white font-bold text-sm">{row.valB}</span>
+                  <span className="text-fore font-bold text-sm font-mono">{row.valB}</span>
                   {row.diff}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Community penetration comparison */}
+          {/* Community penetration */}
           <div className="mt-4">
-            <div className="text-gray-400 text-xs mb-2">Community Penetration</div>
+            <div className="text-dim text-xs font-mono uppercase tracking-widest mb-2">Community Penetration</div>
             {Array.from(new Set([
               ...Object.keys(a.analytics.community_penetration),
               ...Object.keys(b.analytics.community_penetration),
@@ -96,20 +108,20 @@ export function CompareModal({ result, onClose }: Props) {
               const pctB = b.analytics.community_penetration[comm] ?? 0;
               return (
                 <div key={comm} className="mb-2">
-                  <div className="flex justify-between text-xs text-gray-400 mb-0.5">
-                    <span className="capitalize">{comm}</span>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-mid capitalize">{comm}</span>
                     <span>
-                      <span className="text-blue-400">{(pctA * 100).toFixed(0)}%</span>
-                      {' vs '}
-                      <span className="text-purple-400">{(pctB * 100).toFixed(0)}%</span>
+                      <span className="text-sig">{(pctA * 100).toFixed(0)}%</span>
+                      <span className="text-ghost"> vs </span>
+                      <span className="text-ai">{(pctB * 100).toFixed(0)}%</span>
                     </span>
                   </div>
-                  <div className="flex gap-1 h-2">
-                    <div className="flex-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="bg-blue-500 h-full rounded-full" style={{ width: `${pctA * 100}%` }} />
+                  <div className="flex gap-1 h-1.5">
+                    <div className="flex-1 bg-edge rounded-full overflow-hidden">
+                      <div className="bg-sig h-full rounded-full" style={{ width: `${pctA * 100}%` }} />
                     </div>
-                    <div className="flex-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="bg-purple-500 h-full rounded-full" style={{ width: `${pctB * 100}%` }} />
+                    <div className="flex-1 bg-edge rounded-full overflow-hidden">
+                      <div className="bg-ai h-full rounded-full" style={{ width: `${pctB * 100}%` }} />
                     </div>
                   </div>
                 </div>
@@ -118,11 +130,11 @@ export function CompareModal({ result, onClose }: Props) {
           </div>
 
           {/* Recommendation */}
-          <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3">
-            <div className="text-green-400 text-xs font-semibold">Recommendation</div>
-            <div className="text-gray-300 text-sm mt-0.5">
+          <div className="mt-4 bg-neon/5 border border-neon/25 rounded px-4 py-3">
+            <div className="text-neon text-xs font-mono font-bold uppercase tracking-widest mb-1">Recommendation</div>
+            <div className="text-mid text-sm">
               {winner
-                ? <><span className="text-white font-semibold">{winner}</span> achieves higher coverage. Prefer this scenario.</>
+                ? <><span className="text-fore font-semibold">{winner}</span> achieves higher coverage. Prefer this scenario.</>
                 : 'Both scenarios achieve equal coverage.'}
             </div>
           </div>
