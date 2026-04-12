@@ -52,7 +52,7 @@ export function InvestPanel({
 
   const handleSaveScenario = () => {
     if (!lastResult || !lastReq) return;
-    const name = `Scenario ${savedScenarios.length + 1} (${selectedSeeds.length} KOLs)`;
+    const name = `Scenario ${savedScenarios.length + 1} (${lastReq.seed_nodes.length} KOLs)`;
     const next = [...savedScenarios, { name, req: lastReq, result: lastResult }].slice(-2);
     setSavedScenarios(next);
   };
