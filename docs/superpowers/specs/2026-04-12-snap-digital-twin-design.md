@@ -35,7 +35,7 @@
 snap_loader.py
   ├── 解析边列表 → NetworkX 无向图
   ├── BFS 采样（上限 500 节点，自适应跳数）
-  ├── Louvain 社区检测 → 映射到 5 个 community 标签
+  ├── Louvain 社区检测 → Claude 推断数据驱动的 community 标签
   └── PageRank KOL 识别（Top 15）
        ↓
 twin_builder.py
@@ -77,9 +77,10 @@ def load_snap_graph(
 - 计算 NetworkX `pagerank()`，取 Top `n_kol`
 - PageRank 比纯度数更能反映传播影响力
 
-**社区映射**：
+**社区标签**：
 - Louvain 算法检测社区（`python-louvain` 库）
-- 按社区规模排序，映射到 `["tech", "fashion", "finance", "food", "sports"]`
+- 每个社区取 Top 5 高度数节点的特征，调用 Claude 推断社区主题标签（如 "AI research"、"sports media"）
+- 标签完全由数据驱动，不使用固定枚举
 
 **输出 schema**：与 `models.py` 中 `Node` / `Edge` 完全一致，`influence` / `followers` 等字段由度数和 PageRank 线性归一化得到。
 
