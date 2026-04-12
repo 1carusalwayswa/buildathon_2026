@@ -11,3 +11,10 @@ dist/
 # Logs
 logs/
 *.log
+
+# SNAP raw data
+data/snap/*.edges
+data/snap/*.feat
+data/snap/*.featnames
+data/snap/*.egofeat
+data/snap/*.circles
