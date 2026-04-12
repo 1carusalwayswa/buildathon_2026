@@ -1,12 +1,14 @@
-import type { Analytics } from '../types';
+import type { Analytics, Node } from '../types';
 
 interface Props {
   analytics: Analytics | null;
   currentActivated: number;
   totalNodes: number;
+  graphNodes: Node[];
+  onNodeSelect: (nodeId: string) => void;
 }
 
-export function AnalyticsPanel({ analytics, currentActivated, totalNodes }: Props) {
+export function AnalyticsPanel({ analytics, currentActivated, totalNodes, graphNodes, onNodeSelect }: Props) {
   if (!analytics) {
     return (
       <div className="grid grid-cols-2 gap-2">
@@ -56,6 +58,26 @@ export function AnalyticsPanel({ analytics, currentActivated, totalNodes }: Prop
           </div>
         ))}
       </div>
+
+      {analytics.bottleneck_nodes.length > 0 && (
+        <div>
+          <div className="text-gray-400 text-xs mb-1">Bottleneck Nodes</div>
+          <div className="flex flex-wrap gap-1">
+            {analytics.bottleneck_nodes.map((nodeId) => {
+              const n = graphNodes.find((g) => g.id === nodeId);
+              return (
+                <button
+                  key={nodeId}
+                  onClick={() => onNodeSelect(nodeId)}
+                  className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 hover:bg-orange-500/40 transition-colors"
+                >
+                  {n?.name ?? nodeId}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

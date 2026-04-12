@@ -162,6 +162,8 @@ export default function App() {
                   analytics={simResult?.analytics ?? null}
                   currentActivated={currentActivated}
                   totalNodes={totalNodes}
+                  graphNodes={graphData?.nodes ?? []}
+                  onNodeSelect={(nodeId) => { setSelectedNodeId(nodeId); setLayer('nodeDetail'); }}
                 />
                 <ROIRanking analytics={simResult?.analytics ?? null} graphData={graphData} />
               </>
