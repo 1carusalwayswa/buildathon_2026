@@ -8,11 +8,12 @@ echo "Downloading SNAP Twitter ego-nets..."
 curl -L "https://snap.stanford.edu/data/twitter.tar.gz" -o /tmp/twitter.tar.gz
 
 echo "Extracting..."
-tar -xzf /tmp/twitter.tar.gz -C /tmp/
+TMPDIR=$(mktemp -d)
+tar -xzf /tmp/twitter.tar.gz -C "$TMPDIR"
 
 # Copy only .edges files (the graph topology we need)
-cp /tmp/twitter/*.edges "$DEST/"
-rm -f /tmp/twitter.tar.gz
+find "$TMPDIR" -name "*.edges" -exec cp {} "$DEST/" \;
+rm -rf "$TMPDIR" /tmp/twitter.tar.gz
 
 echo "Done. Files in $DEST:"
 ls "$DEST"/*.edges | wc -l
