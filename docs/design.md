@@ -9,8 +9,10 @@
 ## 技术栈
 
 - **后端**: Python 3.12, FastAPI
-- **前端**: React 18, TypeScript, Vite
-- **图可视化**: react-force-graph (力导向图) + D3.js (同心圆布局)
+- **前端**: React 19, TypeScript, Vite 8
+- **图可视化**: react-force-graph-2d (力导向图) + D3.js (同心圆布局)
+- **样式**: Tailwind CSS v4，Signal Intelligence 自定义设计系统
+- **字体**: Syne（UI）+ JetBrains Mono（数据），Google Fonts
 - **LLM**: Claude API (KOL Agent 决策)
 - **通信**: REST API (后端预计算，前端回放)
 

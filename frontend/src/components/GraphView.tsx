@@ -4,14 +4,14 @@ import type { GraphData } from '../types';
 import * as d3 from 'd3';
 
 const COMMUNITY_COLORS: Record<string, string> = {
-  tech: '#3b82f6',
-  fashion: '#ec4899',
-  finance: '#f59e0b',
-  food: '#10b981',
-  sports: '#8b5cf6',
+  tech: '#38bdf8',
+  fashion: '#f472b6',
+  finance: '#fbbf24',
+  food: '#34d399',
+  sports: '#a78bfa',
 };
 
-const PARTICLE_COLOR = () => 'rgba(74,222,128,0.8)';
+const PARTICLE_COLOR = () => 'rgba(0,255,157,0.85)';
 
 interface Props {
   graphData: GraphData | null;
@@ -139,9 +139,9 @@ export function GraphView({
 
   const nodeColor = useCallback(
     (node: any) => {
-      if (newSet.has(node.id)) return '#22c55e';
-      if (activatedSet.has(node.id)) return '#86efac';
-      return COMMUNITY_COLORS[node.community] ?? '#6b7280';
+      if (newSet.has(node.id)) return '#00ff9d';
+      if (activatedSet.has(node.id)) return '#4dffc4';
+      return COMMUNITY_COLORS[node.community] ?? '#5a7a9a';
     },
     [activatedSet, newSet]
   );
@@ -157,7 +157,7 @@ export function GraphView({
       if (node.type === 'kol') {
         ctx.beginPath();
         ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = isActivated ? 'rgba(34,197,94,0.8)' : 'rgba(251,191,36,0.85)';
+        ctx.strokeStyle = isActivated ? 'rgba(0,255,157,0.85)' : 'rgba(245,166,35,0.9)';
         ctx.lineWidth = 2 / globalScale;
         ctx.stroke();
       }
@@ -165,8 +165,8 @@ export function GraphView({
       // Glow for newly activated
       if (isNew) {
         ctx.beginPath();
-        ctx.arc(node.x, node.y, size + 6, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(34,197,94,0.2)';
+        ctx.arc(node.x, node.y, size + 8, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(0,255,157,0.15)';
         ctx.fill();
       }
 
@@ -212,8 +212,8 @@ export function GraphView({
     (link: any) => {
       const srcActivated = activatedSet.has(link.source?.id ?? link.source);
       const tgtActivated = activatedSet.has(link.target?.id ?? link.target);
-      if (srcActivated && tgtActivated) return 'rgba(34,197,94,0.4)';
-      return 'rgba(255,255,255,0.05)';
+      if (srcActivated && tgtActivated) return 'rgba(0,255,157,0.35)';
+      return 'rgba(0,212,255,0.04)';
     },
     [activatedSet]
   );
@@ -255,7 +255,7 @@ export function GraphView({
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-gray-900 overflow-hidden relative">
+    <div ref={containerRef} className="w-full h-full bg-void overflow-hidden relative">
       <ForceGraph2D
         ref={fgRef}
         width={dimensions.width}
@@ -277,7 +277,7 @@ export function GraphView({
         linkDirectionalParticleWidth={2}
         linkDirectionalParticleColor={PARTICLE_COLOR}
         onNodeClick={(node: any) => onNodeClick(node.id)}
-        backgroundColor="#111827"
+        backgroundColor="#040d1a"
         cooldownTicks={100}
       />
       {graphData && (
@@ -291,7 +291,7 @@ export function GraphView({
               restoreForceLayout();
             }
           }}
-          className="absolute top-3 right-3 bg-gray-800/90 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-600 backdrop-blur-sm transition-colors"
+          className="btn-ghost absolute top-3 right-3 text-xs px-3 py-1.5 backdrop-blur-sm"
         >
           {layoutMode === 'force' ? '◎ Concentric' : '⟳ Force'}
         </button>

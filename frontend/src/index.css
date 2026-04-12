@@ -1,1 +1,138 @@
 @import "tailwindcss";
+
+@theme {
+  /* Color tokens */
+  --color-void: #040d1a;
+  --color-surface: #071428;
+  --color-card: #0c1e3a;
+  --color-edge: #142444;
+  --color-edge-hi: #1e3460;
+  --color-fore: #e2f0ff;
+  --color-mid: #8aa8c4;
+  --color-dim: #5a7a9a;
+  --color-ghost: #3a5470;
+  --color-sig: #00d4ff;
+  --color-gold: #f5a623;
+  --color-neon: #00ff9d;
+  --color-risk: #ff3d71;
+  --color-ai: #9945ff;
+  --color-orange: #ff8c42;
+
+  /* Font tokens */
+  --font-sans: 'Syne', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html, body {
+  font-family: 'Syne', ui-sans-serif, system-ui, sans-serif;
+  background-color: #040d1a;
+  color: #e2f0ff;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #040d1a; }
+::-webkit-scrollbar-thumb { background: #142444; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #1e3460; }
+
+/* ──── Button system ──── */
+.btn-sig {
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  color: #00d4ff;
+  border-radius: 4px;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  cursor: pointer;
+}
+.btn-sig:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.16);
+  border-color: rgba(0, 212, 255, 0.65);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.18);
+}
+.btn-sig:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-neon {
+  background: rgba(0, 255, 157, 0.08);
+  border: 1px solid rgba(0, 255, 157, 0.35);
+  color: #00ff9d;
+  border-radius: 4px;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  cursor: pointer;
+}
+.btn-neon:hover:not(:disabled) {
+  background: rgba(0, 255, 157, 0.16);
+  border-color: rgba(0, 255, 157, 0.65);
+  box-shadow: 0 0 12px rgba(0, 255, 157, 0.18);
+}
+.btn-neon:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-ai {
+  background: rgba(153, 69, 255, 0.08);
+  border: 1px solid rgba(153, 69, 255, 0.35);
+  color: #9945ff;
+  border-radius: 4px;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  cursor: pointer;
+}
+.btn-ai:hover:not(:disabled) {
+  background: rgba(153, 69, 255, 0.16);
+  border-color: rgba(153, 69, 255, 0.65);
+  box-shadow: 0 0 12px rgba(153, 69, 255, 0.18);
+}
+
+.btn-ghost {
+  background: rgba(12, 30, 58, 0.6);
+  border: 1px solid #142444;
+  color: #5a7a9a;
+  border-radius: 4px;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  cursor: pointer;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: #1e3460;
+  color: #8aa8c4;
+  background: rgba(20, 36, 68, 0.8);
+}
+.btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-ghost-active {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  color: #00d4ff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* ──── KOL toggle buttons ──── */
+.kol-btn {
+  border-radius: 4px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  cursor: pointer;
+  text-align: left;
+}
+.kol-btn-on {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.45);
+  color: #00d4ff;
+}
+.kol-btn-off {
+  background: rgba(12, 30, 58, 0.5);
+  border: 1px solid #142444;
+  color: #8aa8c4;
+}
+.kol-btn-off:hover {
+  border-color: #1e3460;
+  color: #e2f0ff;
+  background: rgba(20, 36, 68, 0.7);
+}
+
+/* ──── Range input ──── */
+input[type="range"] { accent-color: #00d4ff; }
+
+/* ──── Neon glow text ──── */
+.text-neon-glow {
+  text-shadow: 0 0 8px rgba(0, 255, 157, 0.5);
+}
+.text-sig-glow {
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+}
