@@ -28,9 +28,10 @@ export function GraphView({
   selectedNodeId,
   onNodeClick,
   isPlaying,
-  bottleneckSet: _bottleneckSet,
-  focusNodeId: _focusNodeId,
+  bottleneckSet,
+  focusNodeId,
 }: Props) {
+  void [bottleneckSet, focusNodeId];
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
