@@ -1,10 +1,15 @@
 import os
 import uuid
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from typing import Optional
+import anthropic
+
 from models import (
     GraphData, Node, Edge, SimRequest, SimResult, SimStep,
     AgentDecision, ReasoningStep, Analytics, NodeContribution,
@@ -13,10 +18,46 @@ from models import (
 from graph import generate_graph
 from simulation import run_simulation
 from analytics import compute_analytics
+from snap_loader import load_snap_graph
+from twin_builder import build_all_twins
 
 load_dotenv()
 
-app = FastAPI(title="SocialSim API")
+_graph_cache: dict[str, dict] = {}
+_last_graph_id: Optional[str] = None
+_snap_graph_id: Optional[str] = None   # cached pre-loaded SNAP graph
+
+_SNAP_DIR = Path(__file__).parent.parent / "data" / "snap"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Preload SNAP graph at startup if data is available."""
+    global _snap_graph_id, _last_graph_id
+    if _SNAP_DIR.exists() and any(_SNAP_DIR.glob("*.edges")):
+        print("[startup] Preloading SNAP graph...")
+        try:
+            claude = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            graph_data = load_snap_graph(
+                data_dir=_SNAP_DIR,
+                n_kol=15,
+                max_nodes=500,
+                claude_client=claude,
+            )
+            graph_data = build_all_twins(graph_data)
+            gid = str(uuid.uuid4())
+            _graph_cache[gid] = graph_data
+            _snap_graph_id = gid
+            _last_graph_id = gid
+            print(f"[startup] SNAP graph loaded: {len(graph_data['nodes'])} nodes, id={gid}")
+        except Exception as e:
+            print(f"[startup] SNAP preload failed: {e} — falling back to synthetic")
+    else:
+        print("[startup] No SNAP data found, skipping preload.")
+    yield
+
+
+app = FastAPI(title="SocialSim API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,12 +67,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_graph_cache: dict[str, dict] = {}
-_last_graph_id: Optional[str] = None
-
 
 @app.get("/graph")
 def get_graph(
+    source: str = "synthetic",   # "synthetic" | "snap"
     n_nodes: int = 500,
     n_kol: int = 15,
     m_edges: int = 3,
@@ -40,7 +79,29 @@ def get_graph(
 ):
     global _last_graph_id
     graph_id = str(uuid.uuid4())
-    graph_data = generate_graph(n_nodes, n_kol, m_edges, n_communities, seed=seed)
+
+    if source == "snap":
+        if _snap_graph_id and _snap_graph_id in _graph_cache:
+            # Return the preloaded graph
+            _last_graph_id = _snap_graph_id
+            graph_data = _graph_cache[_snap_graph_id]
+            return {
+                "graph_id": _snap_graph_id,
+                "nodes": [Node(**n) for n in graph_data["nodes"]],
+                "edges": [Edge(**e) for e in graph_data["edges"]],
+            }
+        # Not preloaded — load on demand
+        if not _SNAP_DIR.exists() or not any(_SNAP_DIR.glob("*.edges")):
+            raise HTTPException(
+                status_code=400,
+                detail="SNAP data not found. Run scripts/download_snap.sh first.",
+            )
+        claude = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        graph_data = load_snap_graph(data_dir=_SNAP_DIR, n_kol=n_kol, max_nodes=n_nodes, claude_client=claude)
+        graph_data = build_all_twins(graph_data)
+    else:
+        graph_data = generate_graph(n_nodes, n_kol, m_edges, n_communities, seed=seed)
+
     _graph_cache[graph_id] = graph_data
     _last_graph_id = graph_id
     return {
