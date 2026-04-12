@@ -200,7 +200,7 @@ export function GraphView({
   );
 
   const getHighestDegreeNode = useCallback((): string => {
-    if (!graphData) return '';
+    if (!graphData || graphData.nodes.length === 0) return '';
     const degree = new Map<string, number>();
     for (const e of graphData.edges) {
       degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
