@@ -78,7 +78,7 @@ def _build_user_message(
     # Layer C: network context (runtime)
     network_ctx = ""
     if total_neighbors > 0:
-        pct = round(activated_neighbors / total_neighbors * 100)
+        pct = min(100, round(activated_neighbors / total_neighbors * 100))
         network_ctx = (
             f"\nNetwork context:\n"
             f"- {activated_neighbors}/{total_neighbors} of your connections ({pct}%) "
@@ -114,6 +114,7 @@ def get_kol_decision(
         network_sentiment, activated_neighbors, total_neighbors,
     )
 
+    response = None
     try:
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
