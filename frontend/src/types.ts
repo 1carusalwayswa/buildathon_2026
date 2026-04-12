@@ -79,3 +79,13 @@ export interface NodeDetailResponse {
   neighbors_2hop: Node[];
   edges: Edge[];
 }
+
+export interface CompareRequest {
+  scenarios: SimRequest[];
+  scenario_names: string[];
+}
+
+export interface CompareResult {
+  results: SimResult[];
+  names: string[];
+}

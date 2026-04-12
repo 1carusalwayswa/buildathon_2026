@@ -1,4 +1,4 @@
-import type { GraphData, SimRequest, SimResult, NodeDetailResponse } from '../types';
+import type { GraphData, SimRequest, SimResult, NodeDetailResponse, CompareRequest, CompareResult } from '../types';
 
 const BASE = '/api';
 
@@ -31,5 +31,15 @@ export async function runSimulation(req: SimRequest): Promise<SimResult> {
 export async function fetchNodeDetail(nodeId: string): Promise<NodeDetailResponse> {
   const res = await fetch(`${BASE}/node/${nodeId}`);
   if (!res.ok) throw new Error(`/node/${nodeId} failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function compareSimulations(req: CompareRequest): Promise<CompareResult> {
+  const res = await fetch(`${BASE}/simulate/compare`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`/simulate/compare failed: ${res.statusText}`);
   return res.json();
 }
