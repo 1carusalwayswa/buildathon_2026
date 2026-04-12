@@ -168,7 +168,6 @@ def load_snap_graph(
     data_dir: str | Path | None = None,
     n_kol: int = 15,
     max_nodes: int = 500,
-    seed: int | None = None,
     claude_client=None,
 ) -> dict:
     """
@@ -189,7 +188,7 @@ def load_snap_graph(
     partition = _detect_communities(G)
     pagerank = nx.pagerank(G)
 
-    kol_nodes = sorted(pagerank, key=pagerank.__getitem__, reverse=True)[:n_kol]
+    kol_nodes = sorted(pagerank, key=lambda x: pagerank[x], reverse=True)[:n_kol]
     kol_set = set(kol_nodes)
 
     if claude_client is not None:
