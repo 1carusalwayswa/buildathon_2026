@@ -30,7 +30,8 @@ export function GraphView({
   selectedNodeId,
   onNodeClick,
   isPlaying,
-  // bottleneckSet and focusNodeId are for future use
+  bottleneckSet,
+  focusNodeId,
 }: Props) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
