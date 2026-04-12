@@ -10,6 +10,8 @@ const COMMUNITY_COLORS: Record<string, string> = {
   sports: '#8b5cf6',
 };
 
+const PARTICLE_COLOR = () => 'rgba(74,222,128,0.8)';
+
 interface Props {
   graphData: GraphData | null;
   activatedSet: Set<string>;
@@ -28,10 +30,8 @@ export function GraphView({
   selectedNodeId,
   onNodeClick,
   isPlaying,
-  bottleneckSet,
-  focusNodeId,
+  // bottleneckSet and focusNodeId are for future use
 }: Props) {
-  void [bottleneckSet, focusNodeId];
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -143,7 +143,7 @@ export function GraphView({
         linkDirectionalParticles={isPlaying ? 3 : 0}
         linkDirectionalParticleSpeed={0.004}
         linkDirectionalParticleWidth={2}
-        linkDirectionalParticleColor={() => 'rgba(74,222,128,0.8)'}
+        linkDirectionalParticleColor={PARTICLE_COLOR}
         onNodeClick={(node: any) => onNodeClick(node.id)}
         backgroundColor="#111827"
         cooldownTicks={100}
