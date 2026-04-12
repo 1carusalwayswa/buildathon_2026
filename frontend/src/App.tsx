@@ -1,13 +1,15 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { GraphData, SimResult, SimRequest, AgentDecision } from './types';
-import { fetchGraph, runSimulation } from './api/client';
+import type { GraphData, SimResult, SimRequest, AgentDecision, CompareResult } from './types';
+import { fetchGraph, runSimulation, compareSimulations } from './api/client';
 import { GraphView } from './components/GraphView';
 import { SimulationPlayer } from './components/SimulationPlayer';
 import { InvestPanel } from './components/InvestPanel';
+import type { SavedScenario } from './components/InvestPanel';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { ROIRanking } from './components/ROIRanking';
 import { NodeDetail } from './components/NodeDetail';
 import { AgentDetail } from './components/AgentDetail';
+import { CompareModal } from './components/CompareModal';
 import { useSimulationState } from './hooks/useSimulationState';
 
 type Layer = 'global' | 'nodeDetail' | 'agentDetail';
@@ -21,6 +23,7 @@ export default function App() {
   const [isLoadingGraph, setIsLoadingGraph] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
 
   const simState = useSimulationState(simResult);
 
@@ -79,6 +82,18 @@ export default function App() {
   const handleNodeClick = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
     setLayer('nodeDetail');
+  }, []);
+
+  const handleCompare = useCallback(async (scenarios: SavedScenario[]) => {
+    try {
+      const result = await compareSimulations({
+        scenarios: scenarios.map((s) => s.req),
+        scenario_names: scenarios.map((s) => s.name),
+      });
+      setCompareResult(result);
+    } catch (e: any) {
+      setError(e.message);
+    }
   }, []);
 
   return (
@@ -157,6 +172,8 @@ export default function App() {
                   onSeedsChange={setSelectedSeeds}
                   onRunSimulation={handleRunSimulation}
                   isLoading={isSimulating}
+                  lastResult={simResult}
+                  onCompare={handleCompare}
                 />
                 <AnalyticsPanel
                   analytics={simResult?.analytics ?? null}
@@ -194,6 +211,10 @@ export default function App() {
       <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 flex-shrink-0">
         <SimulationPlayer state={simState} />
       </div>
+
+      {compareResult && (
+        <CompareModal result={compareResult} onClose={() => setCompareResult(null)} />
+      )}
     </div>
   );
 }

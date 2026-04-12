@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import type { GraphData, SimRequest } from '../types';
+import type { GraphData, SimRequest, SimResult } from '../types';
+
+interface SavedScenario {
+  name: string;
+  req: SimRequest;
+  result: SimResult;
+}
 
 interface Props {
   graphData: GraphData | null;
@@ -7,11 +13,25 @@ interface Props {
   onSeedsChange: (seeds: string[]) => void;
   onRunSimulation: (req: SimRequest) => void;
   isLoading: boolean;
+  lastResult: SimResult | null;
+  onCompare: (scenarios: SavedScenario[]) => void;
 }
 
-export function InvestPanel({ graphData, selectedSeeds, onSeedsChange, onRunSimulation, isLoading }: Props) {
+export type { SavedScenario };
+
+export function InvestPanel({
+  graphData,
+  selectedSeeds,
+  onSeedsChange,
+  onRunSimulation,
+  isLoading,
+  lastResult,
+  onCompare,
+}: Props) {
   const [brandName, setBrandName] = useState('');
   const [brandContent, setBrandContent] = useState('');
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
+  const [lastReq, setLastReq] = useState<SimRequest | null>(null);
 
   const kols = graphData?.nodes.filter((n) => n.type === 'kol') ?? [];
 
@@ -25,8 +45,20 @@ export function InvestPanel({ graphData, selectedSeeds, onSeedsChange, onRunSimu
 
   const handleRun = () => {
     if (selectedSeeds.length === 0 || !brandName || !brandContent) return;
-    onRunSimulation({ seed_nodes: selectedSeeds, brand_name: brandName, brand_content: brandContent, n_steps: 20 });
+    const req: SimRequest = { seed_nodes: selectedSeeds, brand_name: brandName, brand_content: brandContent, n_steps: 20 };
+    setLastReq(req);
+    onRunSimulation(req);
   };
+
+  const handleSaveScenario = () => {
+    if (!lastResult || !lastReq) return;
+    const name = `Scenario ${savedScenarios.length + 1} (${selectedSeeds.length} KOLs)`;
+    const next = [...savedScenarios, { name, req: lastReq, result: lastResult }].slice(-2);
+    setSavedScenarios(next);
+  };
+
+  const canSave = lastResult && lastReq && savedScenarios.length < 2;
+  const canCompare = savedScenarios.length === 2;
 
   return (
     <div className="flex flex-col gap-3">
@@ -81,6 +113,35 @@ export function InvestPanel({ graphData, selectedSeeds, onSeedsChange, onRunSimu
       >
         {isLoading ? 'Simulating...' : 'Run Simulation'}
       </button>
+
+      {canSave && (
+        <button
+          onClick={handleSaveScenario}
+          className="bg-blue-700 hover:bg-blue-600 text-white rounded px-4 py-1.5 text-sm transition-colors"
+        >
+          Save as Scenario {savedScenarios.length + 1}
+        </button>
+      )}
+
+      {savedScenarios.length > 0 && (
+        <div className="text-xs text-gray-400 flex flex-col gap-0.5">
+          {savedScenarios.map((s, i) => (
+            <div key={i} className="flex items-center gap-1">
+              <span className={i === 0 ? 'text-blue-400' : 'text-purple-400'}>■</span>
+              <span>{s.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canCompare && (
+        <button
+          onClick={() => onCompare(savedScenarios)}
+          className="bg-purple-600 hover:bg-purple-500 text-white rounded px-4 py-2 text-sm font-semibold transition-colors"
+        >
+          Compare Scenarios
+        </button>
+      )}
     </div>
   );
 }
