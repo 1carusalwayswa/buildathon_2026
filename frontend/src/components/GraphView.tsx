@@ -16,6 +16,9 @@ interface Props {
   newActivated: string[];
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string) => void;
+  isPlaying: boolean;
+  bottleneckSet: Set<string>;
+  focusNodeId: string | null;
 }
 
 export function GraphView({
@@ -24,6 +27,9 @@ export function GraphView({
   newActivated,
   selectedNodeId,
   onNodeClick,
+  isPlaying,
+  bottleneckSet: _bottleneckSet,
+  focusNodeId: _focusNodeId,
 }: Props) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -133,6 +139,10 @@ export function GraphView({
         }}
         linkColor={linkColor}
         linkWidth={0.5}
+        linkDirectionalParticles={isPlaying ? 3 : 0}
+        linkDirectionalParticleSpeed={0.004}
+        linkDirectionalParticleWidth={2}
+        linkDirectionalParticleColor={() => 'rgba(74,222,128,0.8)'}
         onNodeClick={(node: any) => onNodeClick(node.id)}
         backgroundColor="#111827"
         cooldownTicks={100}

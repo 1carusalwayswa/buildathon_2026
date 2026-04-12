@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { GraphData, SimResult, SimRequest, AgentDecision } from './types';
 import { fetchGraph, runSimulation } from './api/client';
 import { GraphView } from './components/GraphView';
@@ -39,6 +39,11 @@ export default function App() {
 
   const selectedNode = graphData?.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedDecision = selectedNodeId ? allDecisions[selectedNodeId] ?? null : null;
+
+  const bottleneckSet = useMemo(
+    () => new Set<string>(simResult?.analytics.bottleneck_nodes ?? []),
+    [simResult]
+  );
 
   const handleLoadGraph = useCallback(async () => {
     setIsLoadingGraph(true);
@@ -111,6 +116,9 @@ export default function App() {
             newActivated={simState.newAtStep}
             selectedNodeId={selectedNodeId}
             onNodeClick={handleNodeClick}
+            isPlaying={simState.isPlaying}
+            bottleneckSet={bottleneckSet}
+            focusNodeId={layer === 'nodeDetail' ? selectedNodeId : null}
           />
           {!graphData && (
             <div className="absolute inset-0 flex items-center justify-center">
