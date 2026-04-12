@@ -116,8 +116,10 @@ export function GraphView({
     if (!graphData) return;
     if (focusNodeId) {
       applyConcentricLayout(focusNodeId);
-    } else if (layoutMode === 'force') {
+      setLayoutMode('concentric');
+    } else {
       restoreForceLayout();
+      setLayoutMode('force');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNodeId, graphData]);
