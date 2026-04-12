@@ -30,6 +30,7 @@ export function GraphView({
   selectedNodeId,
   onNodeClick,
   isPlaying,
+  bottleneckSet,
 }: Props) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,12 +70,13 @@ export function GraphView({
       const isNew = newSet.has(node.id);
       const isSelected = node.id === selectedNodeId;
 
-      // Glow for KOL
+      // Gold stroke ring for KOL
       if (node.type === 'kol') {
         ctx.beginPath();
         ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
-        ctx.fillStyle = isActivated ? 'rgba(34,197,94,0.3)' : 'rgba(255,215,0,0.2)';
-        ctx.fill();
+        ctx.strokeStyle = isActivated ? 'rgba(34,197,94,0.8)' : 'rgba(251,191,36,0.85)';
+        ctx.lineWidth = 2 / globalScale;
+        ctx.stroke();
       }
 
       // Glow for newly activated
@@ -94,6 +96,18 @@ export function GraphView({
         ctx.stroke();
       }
 
+      // Orange dashed ring for bottleneck nodes
+      if (bottleneckSet.has(node.id)) {
+        ctx.save();
+        ctx.setLineDash([4 / globalScale, 2 / globalScale]);
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, size + 8, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(249,115,22,0.85)';
+        ctx.lineWidth = 1.5 / globalScale;
+        ctx.stroke();
+        ctx.restore();
+      }
+
       ctx.beginPath();
       ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
       ctx.fillStyle = nodeColor(node);
@@ -108,7 +122,7 @@ export function GraphView({
         ctx.fillText(label, node.x, node.y - size - 3);
       }
     },
-    [activatedSet, newSet, selectedNodeId, nodeColor]
+    [activatedSet, newSet, selectedNodeId, nodeColor, bottleneckSet]
   );
 
   const linkColor = useCallback(
