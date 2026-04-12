@@ -92,7 +92,7 @@ export function GraphView({
         ctx.beginPath();
         ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI);
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 / globalScale;
         ctx.stroke();
       }
 
