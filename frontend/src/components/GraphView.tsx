@@ -126,12 +126,16 @@ export function GraphView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNodeId, graphData]);
 
-  const graphForce = graphData
-    ? {
-        nodes: graphData.nodes.map((n) => ({ ...n, val: n.influence * 5 })),
-        links: graphData.edges.map((e) => ({ source: e.source, target: e.target, weight: e.weight })),
-      }
-    : { nodes: [], links: [] };
+  const graphForce = useMemo(
+    () =>
+      graphData
+        ? {
+            nodes: graphData.nodes.map((n) => ({ ...n, val: n.influence * 5 })),
+            links: graphData.edges.map((e) => ({ source: e.source, target: e.target, weight: e.weight })),
+          }
+        : { nodes: [], links: [] },
+    [graphData]
+  );
 
   const nodeColor = useCallback(
     (node: any) => {
