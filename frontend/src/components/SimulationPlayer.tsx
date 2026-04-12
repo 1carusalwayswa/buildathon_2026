@@ -10,10 +10,10 @@ export function SimulationPlayer({ state }: Props) {
   const speedOptions: PlaybackSpeed[] = [0.5, 1, 2];
 
   return (
-    <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
+    <div className="flex items-center gap-3">
       <button
         onClick={reset}
-        className="text-gray-400 hover:text-white text-sm px-2"
+        className="btn-ghost px-2 py-1 text-base leading-none"
         title="Reset"
       >
         ⏮
@@ -21,13 +21,16 @@ export function SimulationPlayer({ state }: Props) {
       <button
         onClick={isPlaying ? pause : play}
         disabled={totalSteps === 0}
-        className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white rounded px-3 py-1 text-sm font-medium min-w-[60px]"
+        className={`${isPlaying ? 'btn-sig' : 'btn-neon'} px-4 py-1.5 text-xs font-bold tracking-widest min-w-[72px]`}
       >
-        {isPlaying ? 'Pause' : 'Play'}
+        {isPlaying ? 'PAUSE' : 'PLAY'}
       </button>
 
       <div className="flex items-center gap-2 flex-1">
-        <span className="text-gray-400 text-xs whitespace-nowrap">Step {currentStep}/{totalSteps}</span>
+        <span className="text-xs font-mono whitespace-nowrap">
+          <span className="text-sig">{currentStep}</span>
+          <span className="text-ghost">/{totalSteps}</span>
+        </span>
         <input
           type="range"
           min={0}
@@ -35,7 +38,7 @@ export function SimulationPlayer({ state }: Props) {
           value={currentStep}
           onChange={(e) => setStep(Number(e.target.value))}
           disabled={totalSteps === 0}
-          className="flex-1 accent-blue-500"
+          className="flex-1 h-1"
         />
       </div>
 
@@ -44,9 +47,7 @@ export function SimulationPlayer({ state }: Props) {
           <button
             key={s}
             onClick={() => setSpeed(s)}
-            className={`text-xs px-2 py-1 rounded ${
-              speed === s ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'
-            }`}
+            className={`${speed === s ? 'btn-ghost-active' : 'btn-ghost'} text-xs px-2 py-1 font-mono`}
           >
             {s}x
           </button>
