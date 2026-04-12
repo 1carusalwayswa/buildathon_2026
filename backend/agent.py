@@ -22,25 +22,97 @@ Respond ONLY with valid JSON in this exact format:
 }"""
 
 
-def get_kol_decision(
-    node_id: str,
-    persona: str,
+def _parse_persona(persona: str | None) -> dict:
+    """
+    Parse persona field. Accepts JSON string (Digital Twin) or plain string.
+    Always returns a dict with at least {"raw": <original>}.
+    """
+    if not persona:
+        return {}
+    try:
+        parsed = json.loads(persona)
+        if isinstance(parsed, dict):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return {"raw": persona}
+
+
+def _build_user_message(
+    persona_dict: dict,
     community: str,
     brand_name: str,
     brand_content: str,
     network_sentiment: float,
+    activated_neighbors: int,
+    total_neighbors: int,
+) -> str:
+    """Build the user-turn prompt from structured persona + Layer C context."""
+
+    # Layer A: rich profile if available, plain persona otherwise
+    if persona_dict.get("bio"):
+        profile_lines = (
+            f"- Name: {persona_dict.get('name', 'Unknown')}\n"
+            f"- Bio: {persona_dict['bio']}\n"
+            f"- Topics: {', '.join(persona_dict.get('topics', [community]))}\n"
+            f"- Tone: {persona_dict.get('tone', 'neutral')}\n"
+            f"- Brand sensitivity: {persona_dict.get('brand_sensitivity', 0.5)}"
+        )
+    else:
+        profile_lines = (
+            f"- Community: {community}\n"
+            f"- Persona: {persona_dict.get('raw', 'No description')}"
+        )
+
+    # Layer B: behaviour pattern
+    behavior = persona_dict.get("behavior", {})
+    behavior_lines = ""
+    if behavior:
+        behavior_lines = (
+            f"\nBehaviour pattern:\n"
+            f"- Bridge role (cross-community sharer): {behavior.get('bridge_role', False)}\n"
+            f"- Community loyal (prefers intra-community): {behavior.get('community_loyal', False)}\n"
+            f"- Engagement bias: {behavior.get('engagement_bias', 'medium')}"
+        )
+
+    # Layer C: network context (runtime)
+    network_ctx = ""
+    if total_neighbors > 0:
+        pct = round(activated_neighbors / total_neighbors * 100)
+        network_ctx = (
+            f"\nNetwork context:\n"
+            f"- {activated_neighbors}/{total_neighbors} of your connections ({pct}%) "
+            f"have already engaged with this content."
+        )
+
+    return (
+        f"You are a KOL with this profile:\n{profile_lines}"
+        f"{behavior_lines}"
+        f"\nBrand Campaign:\n"
+        f"- Brand: {brand_name}\n"
+        f"- Content: {brand_content}\n"
+        f"- Network sentiment toward this brand: {network_sentiment:.2f} (0=negative, 1=positive)"
+        f"{network_ctx}\n\n"
+        f"Decide whether to repost, comment, or ignore this content."
+    )
+
+
+def get_kol_decision(
+    node_id: str,
+    persona: str | None,
+    community: str,
+    brand_name: str,
+    brand_content: str,
+    network_sentiment: float,
+    activated_neighbors: int = 0,
+    total_neighbors: int = 0,
 ) -> dict:
     """Call Claude API to get KOL decision. Returns dict with action, reason, content, reasoning_steps."""
-    user_message = f"""You are a KOL with this profile:
-- Community: {community}
-- Persona: {persona}
-
-Brand Campaign:
-- Brand: {brand_name}
-- Content: {brand_content}
-- Current network sentiment toward this brand: {network_sentiment:.2f} (0=negative, 1=positive)
-
-Decide whether to repost, comment, or ignore this content."""
+    persona_dict = _parse_persona(persona)
+    user_message = _build_user_message(
+        persona_dict, community, brand_name, brand_content,
+        network_sentiment, activated_neighbors, total_neighbors,
+    )
 
     try:
         response = client.messages.create(
@@ -50,7 +122,6 @@ Decide whether to repost, comment, or ignore this content."""
             messages=[{"role": "user", "content": user_message}],
         )
         raw = response.content[0].text.strip()
-        # Strip markdown code block wrapping if present
         if raw.startswith("```"):
             raw = raw.split("```", 2)[1]
             if raw.startswith("json"):
@@ -67,7 +138,6 @@ Decide whether to repost, comment, or ignore this content."""
             print(f"[agent] raw response: {repr(response.content)}")
         except Exception:
             pass
-        # Fallback on error
         return {
             "node_id": node_id,
             "action": "ignore",

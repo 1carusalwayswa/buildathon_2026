@@ -52,6 +52,9 @@ def run_simulation(
 
             def call_kol(activator_id: str) -> dict:
                 activator = node_map[activator_id]
+                # Layer C: count how many neighbours are already activated
+                nb_ids = [nb for nb, _ in adjacency[activator_id]]
+                activated_nb = sum(1 for nb in nb_ids if nb in activated)
                 return get_kol_decision(
                     activator_id,
                     activator.get("persona", ""),
@@ -59,6 +62,8 @@ def run_simulation(
                     brand_name,
                     brand_content,
                     avg_sentiment,
+                    activated_neighbors=activated_nb,
+                    total_neighbors=len(nb_ids),
                 )
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(kols_to_decide)) as executor:
