@@ -1,3 +1,5 @@
+from enum import Enum
+
 from pydantic import BaseModel
 from typing import Optional
 
@@ -46,6 +48,7 @@ class AgentDecision(BaseModel):
     reason: str
     content: str
     reasoning_steps: list[ReasoningStep]
+    sentiment_score: Optional[float] = None  # -1.0 to 1.0, event mode only
 
 
 class SimStep(BaseModel):
@@ -93,3 +96,32 @@ class NodeDetailResponse(BaseModel):
     neighbors_1hop: list[Node]
     neighbors_2hop: list[Node]
     edges: list[Edge]
+
+
+class EventType(str, Enum):
+    positive = "positive"
+    negative = "negative"
+    neutral = "neutral"
+
+
+class EventSimRequest(BaseModel):
+    company_name: str
+    event_description: str
+    event_type: EventType
+    n_steps: int = 20
+    graph_id: Optional[str] = None
+    n_seeds: int = 3
+
+
+class SentimentSnapshot(BaseModel):
+    t: int
+    overall: float  # -1.0 to 1.0
+    by_community: dict[str, float]
+
+
+class EventSimResult(BaseModel):
+    steps: list[SimStep]
+    analytics: Analytics
+    sentiment_timeline: list[SentimentSnapshot]
+    community_reactions: dict[str, dict]
+    # community_reactions shape: {community_id: {repost_pct, comment_pct, ignore_pct, avg_sentiment}}
