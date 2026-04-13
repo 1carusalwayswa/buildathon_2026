@@ -99,6 +99,7 @@ export interface EventSimRequest {
   event_type: EventType;
   n_steps?: number;
   n_seeds?: number;
+  graph_id?: string;
 }
 
 export interface SentimentSnapshot {
