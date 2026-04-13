@@ -1,4 +1,4 @@
-import type { GraphData, SimRequest, SimResult, CompareResult } from '../types';
+import type { GraphData, SimRequest, SimResult, CompareResult, EventSimRequest, EventSimResult } from '../types';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
@@ -18,6 +18,7 @@ function fetchWithTimeout(url: string, options: RequestInit & { timeoutMs?: numb
 }
 
 export async function fetchGraph(params?: {
+  source?: 'synthetic' | 'snap';
   n_nodes?: number;
   n_kol?: number;
   m_edges?: number;
@@ -43,4 +44,16 @@ export async function runSimulation(req: SimRequest, signal?: AbortSignal): Prom
   });
   if (!res.ok) throw new Error(`/simulate failed: ${res.statusText}`);
   return res.json() as Promise<SimResult>;
+}
+
+export async function simulateEvent(req: EventSimRequest, signal?: AbortSignal): Promise<EventSimResult> {
+  const res = await fetchWithTimeout(`${BASE}/simulate/event`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+    timeoutMs: 90000,
+    signal,
+  });
+  if (!res.ok) throw new Error(`/simulate/event failed: ${res.statusText}`);
+  return res.json() as Promise<EventSimResult>;
 }
