@@ -34,6 +34,7 @@ export interface AgentDecision {
   reason: string;
   content: string;
   reasoning_steps: ReasoningStep[];
+  sentiment_score?: number;  // -1.0 to 1.0, event mode only
 }
 
 export interface SimStep {
@@ -88,4 +89,34 @@ export interface CompareRequest {
 export interface CompareResult {
   results: SimResult[];
   names: string[];
+}
+
+export type EventType = 'positive' | 'negative' | 'neutral';
+
+export interface EventSimRequest {
+  company_name: string;
+  event_description: string;
+  event_type: EventType;
+  n_steps?: number;
+  n_seeds?: number;
+}
+
+export interface SentimentSnapshot {
+  t: number;
+  overall: number;
+  by_community: Record<string, number>;
+}
+
+export interface CommunityReaction {
+  repost_pct: number;
+  comment_pct: number;
+  ignore_pct: number;
+  avg_sentiment: number;
+}
+
+export interface EventSimResult {
+  steps: SimStep[];
+  analytics: Analytics;
+  sentiment_timeline: SentimentSnapshot[];
+  community_reactions: Record<string, CommunityReaction>;
 }
