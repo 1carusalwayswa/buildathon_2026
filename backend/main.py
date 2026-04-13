@@ -13,13 +13,16 @@ import anthropic
 from models import (
     GraphData, Node, Edge, SimRequest, SimResult, SimStep,
     AgentDecision, ReasoningStep, Analytics, NodeContribution,
-    CompareRequest, CompareResult, NodeDetailResponse
+    CompareRequest, CompareResult, NodeDetailResponse,
+    EventSimRequest, EventSimResult, SentimentSnapshot,
 )
 from graph import generate_graph
 from simulation import run_simulation
 from analytics import compute_analytics
 from snap_loader import load_snap_graph
 from twin_builder import build_all_twins
+from event_seeder import select_event_seeds
+from agent import get_kol_event_decision
 
 load_dotenv()
 
@@ -30,30 +33,61 @@ _snap_graph_id: Optional[str] = None   # cached pre-loaded SNAP graph
 _SNAP_DIR = Path(__file__).parent.parent / "data" / "snap"
 
 
+def _aggregate_sentiment(steps_raw: list[dict], node_map: dict) -> tuple[list[dict], dict]:
+    """
+    Compute sentiment_timeline and community_reactions from simulation steps.
+
+    Returns:
+        timeline: list of SentimentSnapshot dicts
+        community_reactions: dict of {community: {repost_pct, comment_pct, ignore_pct, avg_sentiment}}
+    """
+    timeline = []
+    # community -> list of (action, sentiment_score)
+    community_data: dict[str, list[tuple[str, float]]] = {}
+
+    for step in steps_raw:
+        decisions = step["agent_decisions"]
+        if not decisions:
+            continue
+
+        scores = []
+        by_community: dict[str, list[float]] = {}
+
+        for d in decisions:
+            score = d.get("sentiment_score", 0.0) or 0.0
+            community = node_map.get(d["node_id"], {}).get("community", "unknown")
+            scores.append(score)
+            by_community.setdefault(community, []).append(score)
+            community_data.setdefault(community, []).append((d["action"], score))
+
+        overall = sum(scores) / len(scores) if scores else 0.0
+        snapshot = {
+            "t": step["t"],
+            "overall": round(overall, 3),
+            "by_community": {c: round(sum(v) / len(v), 3) for c, v in by_community.items()},
+        }
+        timeline.append(snapshot)
+
+    # Build community_reactions
+    community_reactions = {}
+    for community, entries in community_data.items():
+        total = len(entries)
+        repost_cnt = sum(1 for a, _ in entries if a == "repost")
+        comment_cnt = sum(1 for a, _ in entries if a == "comment")
+        ignore_cnt = sum(1 for a, _ in entries if a == "ignore")
+        avg_sent = sum(s for _, s in entries) / total if total else 0.0
+        community_reactions[community] = {
+            "repost_pct": round(repost_cnt / total, 3),
+            "comment_pct": round(comment_cnt / total, 3),
+            "ignore_pct": round(ignore_cnt / total, 3),
+            "avg_sentiment": round(avg_sent, 3),
+        }
+
+    return timeline, community_reactions
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Preload SNAP graph at startup if data is available."""
-    global _snap_graph_id, _last_graph_id
-    if _SNAP_DIR.exists() and any(_SNAP_DIR.glob("*.edges")):
-        print("[startup] Preloading SNAP graph...")
-        try:
-            claude = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-            graph_data = load_snap_graph(
-                data_dir=_SNAP_DIR,
-                n_kol=15,
-                max_nodes=500,
-                claude_client=claude,
-            )
-            graph_data = build_all_twins(graph_data)
-            gid = str(uuid.uuid4())
-            _graph_cache[gid] = graph_data
-            _snap_graph_id = gid
-            _last_graph_id = gid
-            print(f"[startup] SNAP graph loaded: {len(graph_data['nodes'])} nodes, id={gid}")
-        except Exception as e:
-            print(f"[startup] SNAP preload failed: {e} — falling back to synthetic")
-    else:
-        print("[startup] No SNAP data found, skipping preload.")
     yield
 
 
@@ -219,3 +253,83 @@ def compare_simulations(req: CompareRequest):
         results.append(result)
 
     return CompareResult(results=results, names=req.scenario_names)
+
+
+@app.post("/simulate/event", response_model=EventSimResult)
+def simulate_event(req: EventSimRequest):
+    if req.graph_id is not None:
+        if req.graph_id not in _graph_cache:
+            raise HTTPException(status_code=400, detail=f"graph_id '{req.graph_id}' not found")
+        graph = _graph_cache[req.graph_id]
+    elif _last_graph_id is not None:
+        graph = _graph_cache[_last_graph_id]
+    else:
+        raise HTTPException(status_code=400, detail="Call GET /graph first")
+
+    nodes = graph["nodes"]
+    edges = graph["edges"]
+    node_map = {n["id"]: n for n in nodes}
+
+    seed_ids = select_event_seeds(nodes, req.event_type.value, req.n_seeds)
+    if not seed_ids:
+        raise HTTPException(status_code=400, detail="No KOL nodes available for event seeding")
+
+    def event_decision_fn(
+        node_id, persona, community, company_name, event_description,
+        network_sentiment, activated_neighbors=0, total_neighbors=0,
+        event_type="neutral",
+    ):
+        return get_kol_event_decision(
+            node_id, persona, community, company_name, event_description,
+            event_type, network_sentiment, activated_neighbors, total_neighbors,
+        )
+
+    steps_raw = run_simulation(
+        nodes, edges, seed_ids,
+        req.company_name, req.event_description, req.n_steps,
+        decision_fn=event_decision_fn,
+        decision_fn_kwargs={"event_type": req.event_type.value},
+    )
+
+    analytics_raw = compute_analytics(nodes, edges, steps_raw, seed_ids)
+    sentiment_timeline, community_reactions = _aggregate_sentiment(steps_raw, node_map)
+
+    steps = []
+    for s in steps_raw:
+        decisions = []
+        for d in s["agent_decisions"]:
+            decisions.append(AgentDecision(
+                node_id=d["node_id"],
+                action=d["action"],
+                reason=d["reason"],
+                content=d["content"],
+                reasoning_steps=[
+                    ReasoningStep(step=r["step"], result=r["result"], passed=r["passed"])
+                    for r in d["reasoning_steps"]
+                ],
+                sentiment_score=d.get("sentiment_score"),
+            ))
+        steps.append(SimStep(
+            t=s["t"],
+            activated=s["activated"],
+            new_activated=s["new_activated"],
+            agent_decisions=decisions,
+        ))
+
+    analytics = Analytics(
+        coverage=analytics_raw["coverage"],
+        max_depth=analytics_raw["max_depth"],
+        peak_step=analytics_raw["peak_step"],
+        total_activated=analytics_raw["total_activated"],
+        community_penetration=analytics_raw["community_penetration"],
+        node_contributions=[NodeContribution(**nc) for nc in analytics_raw["node_contributions"]],
+        bottleneck_nodes=analytics_raw["bottleneck_nodes"],
+        critical_paths=analytics_raw["critical_paths"],
+    )
+
+    return EventSimResult(
+        steps=steps,
+        analytics=analytics,
+        sentiment_timeline=[SentimentSnapshot(**s) for s in sentiment_timeline],
+        community_reactions=community_reactions,
+    )
