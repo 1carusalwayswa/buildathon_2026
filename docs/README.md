@@ -8,8 +8,9 @@ SocialSim 是一个**社交网络影响力传播模拟器**，面向企业营销
 
 **核心价值**：
 
-- 在 500 节点 BA 无标度网络上模拟真实社交传播动态
-- KOL 节点接入 Claude API，以 AI 角色扮演方式决策"转发/评论/忽略"
+- 支持两种图谱来源：**合成 BA 无标度网络**（500 节点）和 **SNAP Twitter 真实社交网络**
+- KOL 节点配备三层 **Digital Twin**：Claude 生成的静态画像（Layer A）、拓扑推断的行为模式（Layer B）、运行时邻居感知（Layer C）
+- KOL 节点以 AI 角色扮演方式决策"转发/评论/忽略"，决策质量随 Digital Twin 丰富度提升
 - 支持多方案对比，输出覆盖率、社区渗透率、传播路径等量化指标
 
 ---
@@ -19,7 +20,7 @@ SocialSim 是一个**社交网络影响力传播模拟器**，面向企业营销
 | 层级 | 技术 |
 |------|------|
 | 后端框架 | Python 3.12, FastAPI |
-| 网络算法 | NetworkX（BA 图生成、社区划分） |
+| 网络算法 | NetworkX（BA 图生成、社区划分）、python-louvain（Louvain 社区检测） |
 | LLM | Anthropic Claude API（`claude-haiku-4-5-20251001`） |
 | 前端框架 | React 19, TypeScript, Vite 8 |
 | 图可视化 | react-force-graph-2d（力导向） + D3.js（同心圆布局） |
@@ -40,7 +41,7 @@ SocialSim 是一个**社交网络影响力传播模拟器**，面向企业营销
 ### 后端启动
 
 ```bash
-cd /Users/lyon/socialsim-backend/socialsim/backend
+cd backend
 
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -51,6 +52,18 @@ uvicorn main:app --port 8001 --reload
 ```
 
 后端运行在 `http://localhost:8001`，Swagger 文档：`http://localhost:8001/docs`
+
+### （可选）加载 SNAP Twitter 真实图谱
+
+```bash
+# 从 Stanford SNAP 下载 Twitter ego-nets（约 21 MB）
+bash scripts/download_snap.sh
+
+# 启动后端后会自动预加载 SNAP 图谱（耗时 ~30s，含 Claude 社区标签生成）
+# 预加载完成日志：[startup] SNAP graph loaded: 500 nodes, id=...
+```
+
+加载完成后，前端调用 `GET /graph?source=snap` 即可使用真实图谱。
 
 ### 前端启动
 
@@ -109,13 +122,16 @@ npm run dev
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `n_nodes` | int | 500 | 节点总数 |
-| `n_kol` | int | 15 | KOL 数量（度数最高的节点） |
-| `m_edges` | int | 3 | BA 模型每步连边数 |
-| `n_communities` | int | 5 | 社区数量 |
-| `seed` | int? | null | 随机种子（为 null 时每次生成不同图） |
+| `source` | str | `"synthetic"` | 图谱来源：`synthetic`（BA合成）或 `snap`（SNAP Twitter真实图谱） |
+| `n_nodes` | int | 500 | 节点总数（仅 `source=synthetic` 时生效） |
+| `n_kol` | int | 15 | KOL 数量 |
+| `m_edges` | int | 3 | BA 模型每步连边数（仅 `source=synthetic`） |
+| `n_communities` | int | 5 | 社区数量（仅 `source=synthetic`） |
+| `seed` | int? | null | 随机种子（仅 `source=synthetic`） |
 
 **返回** `GraphData`：包含 `nodes[]`、`edges[]` 和 `graph_id`（UUID）
+
+> `source=snap` 时：服务器启动时已预加载，直接返回缓存；若数据文件不存在，返回 400 并提示运行 `download_snap.sh`。
 
 ---
 
@@ -209,12 +225,37 @@ npm run dev
 | `id` | str | 节点唯一 ID，格式 `n_{index}` |
 | `name` | str | 随机生成的用户名 |
 | `type` | str | `"kol"` 或 `"normal"` |
-| `community` | str | 所属社区：tech / fashion / finance / food / sports |
+| `community` | str | 所属社区标签（合成图：固定 5 类；SNAP 图：Claude 数据驱动生成，如 `"professional networking community"`） |
 | `influence` | float | 影响力 0~1，KOL 偏高（0.6~1.0） |
 | `activity` | float | 活跃度 0~1 |
 | `sentiment` | float | 对品牌的好感度 0~1 |
 | `followers` | int | 粉丝数，KOL 为 5000~50000，普通用户为 50~2000 |
-| `persona` | str? | KOL 专属人设描述，传入 Claude 作为角色背景 |
+| `persona` | str? | KOL 专属 Digital Twin JSON（合成图：纯文字描述；SNAP 图：三层结构体，见下） |
+
+**SNAP 图 KOL `persona` 字段格式（Digital Twin JSON）**
+
+```json
+{
+  "name": "Alex Chen",
+  "bio": "Tech industry connector bridging enterprise and startup ecosystems...",
+  "topics": ["professional networking", "tech innovation", "career development"],
+  "tone": "professional",
+  "posting_frequency": "high",
+  "brand_sensitivity": 0.72,
+  "behavior": {
+    "bridge_role": true,
+    "community_loyal": false,
+    "engagement_bias": "high",
+    "content_filters": ["shares_cross_community"]
+  }
+}
+```
+
+| 字段 | 来源 | 说明 |
+|------|------|------|
+| `name/bio/topics/tone` | Layer A（Claude 生成） | 静态画像，基于节点拓扑属性生成 |
+| `posting_frequency/brand_sensitivity` | Layer A | Claude 推断 |
+| `behavior` | Layer B（纯拓扑推断） | 从介数中心性、聚类系数、度数离线计算，无需 API 调用 |
 
 ### Edge（边）
 
@@ -350,18 +391,56 @@ P(激活) = edge_weight × influence × activity × sentiment
 - 新激活的节点在**下一时间步**才参与传播（BFS 分层）
 - 无新激活节点时模拟提前终止
 
-### KOL 节点 — Claude API Agent（并行调用）
+### KOL 节点 — Claude API Agent（并行调用 + Digital Twin 三层 Prompt）
 
-当普通节点的传播到达 KOL 节点时，调用 `claude-haiku-4-5-20251001` 做决策。同一时间步内的多个 KOL 使用 `ThreadPoolExecutor` **并行调用**，将模拟时间从 O(n_kol) 压缩至 O(1)（约 30s → 3s）：
+当普通节点的传播到达 KOL 节点时，调用 `claude-haiku-4-5-20251001` 做决策。同一时间步内的多个 KOL 使用 `ThreadPoolExecutor` **并行调用**，将模拟时间从 O(n_kol) 压缩至 O(1)（约 30s → 3s）。
 
-**输入（user message）**
+SNAP 图谱下，每个 KOL 的 prompt 包含三层上下文：
+
+**Layer A — 静态画像**（Claude 在启动时预生成）
+```
+- Name: Alex Chen
+- Bio: Tech industry connector bridging enterprise and startup ecosystems...
+- Topics: professional networking, tech innovation, career development
+- Tone: professional
+- Brand sensitivity: 0.72
+```
+
+**Layer B — 行为模式**（拓扑离线推断，无额外 API 调用）
+```
+Behaviour pattern:
+- Bridge role (cross-community sharer): True
+- Community loyal (prefers intra-community): False
+- Engagement bias: high
+```
+
+**Layer C — 运行时邻居感知**（每次模拟步骤动态注入）
+```
+Network context:
+- 4/12 of your connections (33%) have already engaged with this content.
+```
+
+合成图下退化为旧版纯文字 persona（向后兼容）。
+
+**完整输入示例（SNAP 图）**
 
 ```
-- Community: tech
-- Persona: Tech blogger focused on AI and consumer electronics...
+- Name: Alex Chen
+- Bio: Tech industry connector...
+- Topics: professional networking, tech innovation
+- Tone: professional
+- Brand sensitivity: 0.72
+
+Behaviour pattern:
+- Bridge role: True / Community loyal: False / Engagement bias: high
+
+Brand Campaign:
 - Brand: TechBrand X
 - Content: 革命性的 AI 助手...
-- Current network sentiment: 0.65
+- Network sentiment: 0.65
+
+Network context:
+- 4/12 of your connections (33%) have already engaged with this content.
 ```
 
 **输出（JSON）**
@@ -399,13 +478,20 @@ P(激活) = edge_weight × influence × activity × sentiment
 ```
 buildathon_2026/
 ├── backend/
-│   ├── main.py          # FastAPI 路由入口
+│   ├── main.py          # FastAPI 路由入口（含 lifespan SNAP 预加载）
 │   ├── models.py        # Pydantic 数据模型
-│   ├── graph.py         # BA 网络生成、社区划分
-│   ├── simulation.py    # IC 传播引擎
-│   ├── agent.py         # Claude API KOL 决策
+│   ├── graph.py         # BA 合成网络生成、社区划分
+│   ├── snap_loader.py   # SNAP 图解析：边加载、BFS 采样、Louvain 社区、PageRank KOL
+│   ├── twin_builder.py  # Digital Twin 构建：Layer A（Claude）+ Layer B（拓扑）
+│   ├── simulation.py    # IC 传播引擎（含 Layer C 邻居感知注入）
+│   ├── agent.py         # Claude API KOL 决策（JSON persona 解析 + 三层 Prompt）
 │   ├── analytics.py     # 分析指标计算
+│   ├── tests/           # pytest 单元/集成测试（15 个）
 │   └── requirements.txt
+├── data/
+│   └── snap/            # SNAP .edges 文件（运行 download_snap.sh 生成，不入 git）
+├── scripts/
+│   └── download_snap.sh # 一键下载 SNAP Twitter ego-nets
 ├── frontend/
 │   └── src/
 │       ├── App.tsx                      # 主应用，全局状态管理
@@ -483,3 +569,70 @@ Agent 决策仅在 KOL 节点（约 15 个）被激活时触发，且每个 KOL 
 **Q: 每次加载的图都一样**
 
 `GET /graph` 不传 `seed` 参数时使用随机种子，每次生成不同拓扑。如需复现特定图，传 `?seed=42`。
+
+---
+
+**Q: SNAP 图谱加载报错 "SNAP data not found"**
+
+`data/snap/` 目录下没有 `.edges` 文件。运行 `bash scripts/download_snap.sh` 下载。
+
+---
+
+**Q: SNAP 图谱社区标签不够准确**
+
+标签由 Claude 根据社区结构统计（规模、内部密度、跨社区连接数）推断，无真实 tweet 内容作为输入，属于结构性近似。重启服务后标签会重新生成（Louvain 社区检测是非确定性的）。
+
+---
+
+## 10. SNAP 数据管道
+
+### 数据来源
+
+**SNAP Twitter ego-nets**（Stanford Network Analysis Project）  
+- 973 个 ego 网络 `.edges` 文件，总计 ~230 万条边  
+- 节点为匿名用户 ID，边为关注/好友关系
+
+### 管道流程
+
+```
+data/snap/*.edges
+       ↓
+snap_loader.py
+  ├── _load_edges()          — 读取所有 .edges，合并为无向图
+  ├── _bfs_sample()          — 从最高度节点出发 BFS，截断至 500 节点
+  ├── _detect_communities()  — Louvain 社区检测（python-louvain）
+  ├── _infer_community_labels() — 每个社区调用 Claude 推断主题标签
+  └── load_snap_graph()      — 组装输出，格式与 generate_graph() 完全兼容
+       ↓
+twin_builder.py
+  ├── _build_layer_b()       — 从介数/聚类/度数离线推断行为模式（无 API 调用）
+  ├── build_twin()           — Claude 生成 Layer A 静态画像，合并 Layer B
+  └── build_all_twins()      — 批量处理所有 KOL 节点（约 15 次 API 调用）
+       ↓
+_graph_cache（内存缓存，与合成图共用）
+       ↓
+/simulate → agent.py（Layer C 邻居感知在运行时动态注入）
+```
+
+### KOL 识别策略
+
+| 方式 | 合成图 | SNAP 图 |
+|------|--------|---------|
+| 识别算法 | 度中心性 Top N | PageRank Top N |
+| 依据 | 直接连接数 | 传播影响力（考虑网络全局结构） |
+
+### Digital Twin 三层架构
+
+| 层 | 名称 | 生成时机 | 方法 |
+|----|------|---------|------|
+| A | 静态画像 | 服务器启动（一次性） | Claude Haiku |
+| B | 行为模式 | 服务器启动（一次性） | 拓扑公式（无 API） |
+| C | 邻居感知 | 每个模拟步骤（动态） | 运行时计算后注入 prompt |
+
+**Layer B 行为推断逻辑**
+
+| 拓扑特征 | 阈值 | 推断行为 |
+|---------|------|---------|
+| 介数中心性 | > 0.01 | `bridge_role=True`（跨社区传播者） |
+| 聚类系数 | > 0.3 | `community_loyal=True`（深耕单一社区） |
+| 度数 | > 100 / > 30 / 其他 | `engagement_bias`: high / medium / low |
