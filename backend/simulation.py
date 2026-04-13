@@ -1,5 +1,6 @@
 import random
 import concurrent.futures
+from typing import Callable, Optional
 from agent import get_kol_decision
 
 
@@ -10,8 +11,21 @@ def run_simulation(
     brand_name: str,
     brand_content: str,
     max_steps: int = 20,
+    decision_fn: Optional[Callable] = None,
+    decision_fn_kwargs: Optional[dict] = None,
 ) -> list[dict]:
-    """Run IC model simulation. Returns list of SimStep dicts."""
+    """Run IC model simulation. Returns list of SimStep dicts.
+
+    decision_fn: callable with signature (node_id, persona, community, brand_name, brand_content,
+                 network_sentiment, activated_neighbors, total_neighbors) -> dict
+                 Defaults to get_kol_decision.
+    decision_fn_kwargs: extra keyword arguments passed to decision_fn (e.g. event_type).
+    """
+    if decision_fn is None:
+        decision_fn = get_kol_decision
+    if decision_fn_kwargs is None:
+        decision_fn_kwargs = {}
+
     # Build adjacency: node_id -> list of (neighbor_id, weight)
     adjacency: dict[str, list[tuple[str, float]]] = {n["id"]: [] for n in nodes}
     for edge in edges:
@@ -21,12 +35,11 @@ def run_simulation(
     node_map = {n["id"]: n for n in nodes}
 
     activated = set(seed_nodes)
-    tried: set[tuple[str, str]] = set()  # (activator, target) pairs already attempted
-    agent_decision_map: dict[str, dict] = {}  # node_id -> decision
+    tried: set[tuple[str, str]] = set()
+    agent_decision_map: dict[str, dict] = {}
 
     steps = []
 
-    # t=0: seed nodes
     steps.append({
         "t": 0,
         "activated": list(activated),
@@ -38,10 +51,8 @@ def run_simulation(
         new_activated = []
         agent_decisions = []
 
-        # Current frontier: nodes activated in previous step
         prev_new = steps[-1]["new_activated"]
 
-        # Collect KOLs needing decisions this step, then call them in parallel
         kols_to_decide = [
             activator_id for activator_id in prev_new
             if node_map[activator_id]["type"] == "kol" and activator_id not in agent_decision_map
@@ -52,10 +63,9 @@ def run_simulation(
 
             def call_kol(activator_id: str) -> dict:
                 activator = node_map[activator_id]
-                # Layer C: count how many neighbours are already activated
                 nb_ids = [nb for nb, _ in adjacency[activator_id]]
                 activated_nb = sum(1 for nb in nb_ids if nb in activated)
-                return get_kol_decision(
+                return decision_fn(
                     activator_id,
                     activator.get("persona", ""),
                     activator["community"],
@@ -64,6 +74,7 @@ def run_simulation(
                     avg_sentiment,
                     activated_neighbors=activated_nb,
                     total_neighbors=len(nb_ids),
+                    **decision_fn_kwargs,
                 )
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(kols_to_decide)) as executor:
@@ -76,20 +87,18 @@ def run_simulation(
         for activator_id in prev_new:
             activator = node_map[activator_id]
 
-            # If activator is KOL and has a decision
             if activator["type"] == "kol" and activator_id in agent_decision_map:
                 decision = agent_decision_map[activator_id]
                 if activator_id not in decisions_added:
                     agent_decisions.append(decision)
                     decisions_added.add(activator_id)
 
-                # KOL spread probability
                 if decision["action"] == "repost":
                     spread_mult = 0.9
                 elif decision["action"] == "comment":
                     spread_mult = 0.4
                 else:
-                    continue  # ignore: no spread
+                    continue
 
                 for neighbor_id, weight in adjacency[activator_id]:
                     if neighbor_id not in activated and (activator_id, neighbor_id) not in tried:
@@ -99,7 +108,6 @@ def run_simulation(
                             new_activated.append(neighbor_id)
 
             elif activator["type"] == "normal":
-                # IC model: P = weight * influence * activity * sentiment
                 inf = activator["influence"]
                 act = activator["activity"]
                 sent = activator["sentiment"]
