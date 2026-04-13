@@ -195,7 +195,7 @@ export default function App() {
             onNodeClick={handleNodeClick}
             isPlaying={simState.isPlaying}
             bottleneckSet={bottleneckSet}
-            focusNodeId={null}
+            focusNodeId={layer === 'nodeDetail' ? selectedNodeId : null}
           />
           {!graphData && (
             <div className="absolute inset-0 flex items-center justify-center">
