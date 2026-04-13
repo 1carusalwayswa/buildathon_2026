@@ -3,13 +3,13 @@ import ForceGraph2D from 'react-force-graph-2d';
 import type { GraphData } from '../types';
 import * as d3 from 'd3';
 
-const COMMUNITY_COLORS: Record<string, string> = {
-  tech: '#38bdf8',
-  fashion: '#f472b6',
-  finance: '#fbbf24',
-  food: '#34d399',
-  sports: '#a78bfa',
-};
+const COLOR_PALETTE = ['#38bdf8', '#f472b6', '#fbbf24', '#34d399', '#a78bfa', '#fb923c', '#e879f9', '#4ade80'];
+
+/** Build a stable community→color map from all unique community values in the graph. */
+function buildCommunityColorMap(nodes: { community: string }[]): Record<string, string> {
+  const unique = [...new Set(nodes.map((n) => n.community))].sort();
+  return Object.fromEntries(unique.map((c, i) => [c, COLOR_PALETTE[i % COLOR_PALETTE.length]]));
+}
 
 const PARTICLE_COLOR = () => 'rgba(0,255,157,0.85)';
 
@@ -102,7 +102,22 @@ export function GraphView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [layoutMode, setLayoutMode] = useState<'force' | 'concentric'>('force');
+  const [filterCommunities, setFilterCommunities] = useState<Set<string>>(new Set());
   const newSet = useMemo(() => new Set(newActivated), [newActivated]);
+
+  const communityColorMap = useMemo(
+    () => (graphData ? buildCommunityColorMap(graphData.nodes) : {}),
+    [graphData]
+  );
+
+  const toggleFilter = useCallback((community: string) => {
+    setFilterCommunities(prev => {
+      const next = new Set(prev);
+      if (next.has(community)) next.delete(community);
+      else next.add(community);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -113,6 +128,16 @@ export function GraphView({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Spread KOL nodes by giving them much stronger repulsion
+  useEffect(() => {
+    if (!fgRef.current || !graphData) return;
+    fgRef.current.d3Force(
+      'charge',
+      d3.forceManyBody<any>().strength((node: any) => (node.type === 'kol' ? -400 : -60))
+    );
+    fgRef.current.d3ReheatSimulation();
+  }, [graphData]);
 
   useEffect(() => {
     if (!graphData) return;
@@ -139,11 +164,13 @@ export function GraphView({
 
   const nodeColor = useCallback(
     (node: any) => {
+      const filtered = filterCommunities.size > 0 && !filterCommunities.has(node.community);
+      if (filtered) return '#2a3a4a';
       if (newSet.has(node.id)) return '#00ff9d';
-      if (activatedSet.has(node.id)) return '#4dffc4';
-      return COMMUNITY_COLORS[node.community] ?? '#5a7a9a';
+      if (activatedSet.has(node.id)) return '#ef4444';
+      return communityColorMap[node.community] ?? '#5a7a9a';
     },
-    [activatedSet, newSet]
+    [activatedSet, newSet, filterCommunities, communityColorMap]
   );
 
   const nodeCanvasObject = useCallback(
@@ -197,7 +224,7 @@ export function GraphView({
       ctx.fill();
 
       // Label for KOL
-      if (node.type === 'kol' && globalScale > 0.8) {
+      if (node.type === 'kol' && globalScale > 0.15) {
         const label = node.name.split(' ')[0];
         ctx.font = `${10 / globalScale}px Sans-Serif`;
         ctx.textAlign = 'center';
@@ -213,7 +240,7 @@ export function GraphView({
       const srcActivated = activatedSet.has(link.source?.id ?? link.source);
       const tgtActivated = activatedSet.has(link.target?.id ?? link.target);
       if (srcActivated && tgtActivated) return 'rgba(0,255,157,0.35)';
-      return 'rgba(0,212,255,0.04)';
+      return 'rgba(0,212,255,0.18)';
     },
     [activatedSet]
   );
@@ -272,7 +299,11 @@ export function GraphView({
         }}
         linkColor={linkColor}
         linkWidth={0.5}
-        linkDirectionalParticles={isPlaying ? 3 : 0}
+        linkDirectionalParticles={(link: any) => {
+          if (!isPlaying) return 0;
+          const srcId = link.source?.id ?? link.source;
+          return activatedSet.has(srcId) ? 1 : 0;
+        }}
         linkDirectionalParticleSpeed={0.004}
         linkDirectionalParticleWidth={2}
         linkDirectionalParticleColor={PARTICLE_COLOR}
@@ -280,6 +311,61 @@ export function GraphView({
         backgroundColor="#040d1a"
         cooldownTicks={100}
       />
+      {graphData && (
+        <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 text-xs space-y-1.5 border border-white/10">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-white/50 font-semibold tracking-wider uppercase text-[10px]">Legend</span>
+            {filterCommunities.size > 0 && (
+              <button
+                onClick={() => setFilterCommunities(new Set())}
+                className="text-white/30 hover:text-white/60 text-[10px] ml-3 transition-colors"
+              >
+                clear
+              </button>
+            )}
+          </div>
+          {Object.entries(communityColorMap).map(([name, color]) => {
+            const active = filterCommunities.has(name);
+            const dimmed = filterCommunities.size > 0 && !active;
+            return (
+              <div
+                key={name}
+                onClick={() => toggleFilter(name)}
+                className="flex items-center gap-2 cursor-pointer rounded px-1 -mx-1 transition-colors hover:bg-white/5"
+                style={{ opacity: dimmed ? 0.35 : 1 }}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all"
+                  style={{
+                    backgroundColor: color as string,
+                    boxShadow: active ? `0 0 6px ${color}` : 'none',
+                  }}
+                />
+                <span className={`capitalize transition-colors ${active ? 'text-white' : 'text-white/70'}`}>{name}</span>
+                {active && <span className="ml-auto text-white/40">✓</span>}
+              </div>
+            );
+          })}
+          <div className="border-t border-white/10 pt-1.5 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-[#00ff9d]" />
+              <span className="text-white/70">Newly Activated</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-[#ef4444]" />
+              <span className="text-white/70">Affected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full border-2 border-[#f5a623] flex-shrink-0" style={{ backgroundColor: 'transparent' }} />
+              <span className="text-white/70">KOL Node</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-[#f97316] flex-shrink-0" style={{ backgroundColor: 'transparent' }} />
+              <span className="text-white/70">Bottleneck</span>
+            </div>
+          </div>
+        </div>
+      )}
       {graphData && (
         <button
           onClick={() => {

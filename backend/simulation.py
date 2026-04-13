@@ -115,7 +115,7 @@ def run_simulation(
                 for neighbor_id, weight in adjacency[activator_id]:
                     if neighbor_id not in activated and (activator_id, neighbor_id) not in tried:
                         tried.add((activator_id, neighbor_id))
-                        p = weight * inf * act * sent
+                        p = weight * (0.3 + 0.7 * inf * act)
                         if random.random() < p:
                             activated.add(neighbor_id)
                             new_activated.append(neighbor_id)

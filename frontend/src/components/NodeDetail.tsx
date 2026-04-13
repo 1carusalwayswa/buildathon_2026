@@ -77,12 +77,40 @@ export function NodeDetail({ node, analytics, agentDecision, onViewAgentDetail, 
         </div>
       )}
 
-      {node.type === 'kol' && node.persona && (
-        <div className="bg-card border border-edge rounded p-3">
-          <div className="text-dim text-xs font-mono uppercase tracking-wide mb-1">Persona</div>
-          <p className="text-mid text-xs leading-relaxed">{node.persona}</p>
-        </div>
-      )}
+      {node.type === 'kol' && node.persona && (() => {
+        let parsed: any = null;
+        try { parsed = JSON.parse(node.persona!); } catch { /* plain string fallback */ }
+        if (!parsed) {
+          return (
+            <div className="bg-card border border-edge rounded p-3">
+              <div className="text-dim text-xs font-mono uppercase tracking-wide mb-1">Persona</div>
+              <p className="text-mid text-xs leading-relaxed">{node.persona}</p>
+            </div>
+          );
+        }
+        return (
+          <div className="bg-card border border-edge rounded p-3 flex flex-col gap-2">
+            <div className="text-dim text-xs font-mono uppercase tracking-wide">Persona</div>
+            {parsed.bio && <p className="text-mid text-xs leading-relaxed">{parsed.bio}</p>}
+            {parsed.topics?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {parsed.topics.map((t: string) => (
+                  <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-sig/10 text-sig border border-sig/25 font-mono">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-3 text-xs font-mono">
+              {parsed.tone && <span className="text-ghost">Tone: <span className="text-mid">{parsed.tone}</span></span>}
+              {parsed.posting_frequency && <span className="text-ghost">Posts: <span className="text-mid">{parsed.posting_frequency}</span></span>}
+              {parsed.brand_sensitivity != null && (
+                <span className="text-ghost">Brand sensitivity: <span className="text-mid">{(parsed.brand_sensitivity * 100).toFixed(0)}%</span></span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {node.type === 'kol' && agentDecision && (
         <button

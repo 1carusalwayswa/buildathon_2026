@@ -8,6 +8,8 @@ _client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 _TWIN_SYSTEM = (
     "You are a social media analyst building digital twin profiles for Twitter KOLs. "
     "Given network topology metrics, generate a realistic Twitter user persona. "
+    "Names must reflect real-world demographic diversity: mix Swedish/Nordic, British, American, "
+    "Latin American, South Asian, East Asian, and African names. Avoid over-representing any single ethnicity. "
     "Respond ONLY with valid JSON matching the exact schema in the user message."
 )
 
@@ -69,7 +71,7 @@ def build_twin(
         f"- Inferred behaviour: {json.dumps(layer_b)}\n\n"
         f"Return ONLY a JSON object with this exact schema:\n"
         f'{{\n'
-        f'  "name": "<realistic Twitter display name, e.g. Jordan Wei>",\n'
+        f'  "name": "<realistic Twitter display name — use diverse names reflecting global users including Swedish/Nordic names (e.g. Erik Lindqvist, Sara Johansson, Alex Chen, Maria Santos, Priya Nair, James Okafor)>",\n'
         f'  "bio": "<2-sentence Twitter bio matching the community>",\n'
         f'  "topics": ["<topic1>", "<topic2>", "<topic3>"],\n'
         f'  "tone": "<analytical|casual|enthusiastic|skeptical|professional>",\n'

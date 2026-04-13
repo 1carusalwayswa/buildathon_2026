@@ -28,6 +28,11 @@ export function InvestPanel({
   lastResult,
   onCompare,
 }: Props) {
+  const DEMO = {
+    brandName: 'NovaSkin',
+    brandContent: 'NovaSkin launches its AI-powered skincare line — personalized serums formulated in real time based on your skin DNA. Clean ingredients, zero compromise.',
+  };
+
   const [brandName, setBrandName] = useState('');
   const [brandContent, setBrandContent] = useState('');
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
@@ -64,9 +69,14 @@ export function InvestPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-fore text-xs font-bold tracking-widest uppercase flex items-center gap-2">
-        <span className="text-sig">▸</span> Campaign Setup
-      </h3>
+      <div className="flex justify-end">
+        <button
+          onClick={() => { setBrandName(DEMO.brandName); setBrandContent(DEMO.brandContent); }}
+          className="text-[10px] font-mono px-2 py-0.5 rounded border border-edge text-ghost hover:text-sig hover:border-sig/50 transition-colors"
+        >
+          Demo
+        </button>
+      </div>
 
       <div>
         <label className="text-dim text-xs mb-1 block font-mono uppercase tracking-wide">Brand Name</label>

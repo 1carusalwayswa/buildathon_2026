@@ -65,63 +65,39 @@ except ImportError:
     _LOUVAIN_AVAILABLE = False
 
 
-def _detect_communities(G: nx.Graph) -> dict[int, int]:
-    """Louvain community detection. Returns {node_id: community_int}."""
+def _detect_communities(G: nx.Graph, min_communities: int = 4) -> dict[int, int]:
+    """Community detection with min_communities guarantee.
+    Tries Louvain → greedy modularity → degree-quantile fallback.
+    Returns {node_id: community_int}.
+    """
+    partition: dict[int, int] | None = None
+
     if _LOUVAIN_AVAILABLE:
-        return community_louvain.best_partition(G)
-    # Fallback: label propagation
-    communities = nx.algorithms.community.label_propagation_communities(G)
-    return {node: i for i, comm in enumerate(communities) for node in comm}
+        partition = community_louvain.best_partition(G)
 
-
-def _infer_community_labels(
-    G: nx.Graph,
-    partition: dict[int, int],
-    claude_client,
-) -> dict[int, str]:
-    """
-    For each community, compute structural stats and ask Claude for a topic label.
-    Returns {community_int: label_string}.
-    """
-    community_ids = sorted(set(partition.values()))
-    labels: dict[int, str] = {}
-
-    for cid in community_ids:
-        members = [n for n, c in partition.items() if c == cid]
-        subgraph = G.subgraph(members)
-
-        size = len(members)
-        density = round(nx.density(subgraph), 4)
-        avg_degree = round(
-            sum(dict(subgraph.degree()).values()) / max(size, 1), 1
-        )
-        bridge_count = sum(
-            1 for u in members for v in G.neighbors(u) if partition.get(v) != cid
-        )
-
-        prompt = (
-            f"A social network community has these structural characteristics:\n"
-            f"- Size: {size} nodes\n"
-            f"- Internal density: {density}\n"
-            f"- Average internal degree: {avg_degree}\n"
-            f"- Cross-community connections: {bridge_count}\n\n"
-            f"Based on typical Twitter community patterns, suggest a concise topic label "
-            f"(2-4 words). Examples: 'tech influencers', 'sports fans', 'finance news', "
-            f"'entertainment media', 'political commentary'.\n\n"
-            f"Respond with ONLY the label, no explanation."
-        )
-
+    if partition is None or len(set(partition.values())) < min_communities:
         try:
-            response = claude_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=20,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            labels[cid] = response.content[0].text.strip().lower()
+            comms = list(nx.algorithms.community.greedy_modularity_communities(G))
+            if len(comms) >= min_communities:
+                return {node: i for i, comm in enumerate(comms) for node in comm}
         except Exception:
-            labels[cid] = f"community_{cid}"
+            pass
 
-    return labels
+    # Last resort: split by degree quantile into min_communities buckets
+    if partition is None or len(set(partition.values())) < min_communities:
+        degrees = dict(G.degree())
+        sorted_nodes = sorted(G.nodes(), key=lambda n: degrees[n])
+        n = len(sorted_nodes)
+        partition = {node: (i * min_communities) // n for i, node in enumerate(sorted_nodes)}
+
+    return partition
+
+
+def _assign_community_labels(partition: dict[int, int]) -> dict[int, str]:
+    """Assign a unique topic label to each community (round-robin, demo use)."""
+    _LABELS = ["tech", "fashion", "finance", "food", "sports"]
+    community_ids = sorted(set(partition.values()))
+    return {cid: _LABELS[i % len(_LABELS)] for i, cid in enumerate(community_ids)}
 
 
 def _compute_node_attributes(
@@ -191,10 +167,7 @@ def load_snap_graph(
     kol_nodes = sorted(pagerank, key=lambda x: pagerank[x], reverse=True)[:n_kol]
     kol_set = set(kol_nodes)
 
-    if claude_client is not None:
-        community_labels = _infer_community_labels(G, partition, claude_client)
-    else:
-        community_labels = {cid: f"community_{cid}" for cid in set(partition.values())}
+    community_labels = _assign_community_labels(partition)
 
     nodes = _compute_node_attributes(G, partition, pagerank, kol_set, community_labels)
 

@@ -9,9 +9,6 @@ export function ROIRanking({ analytics, graphData }: Props) {
   if (!analytics || !graphData) {
     return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-fore text-xs font-bold tracking-widest uppercase flex items-center gap-2">
-          <span className="text-gold">▸</span> ROI Ranking
-        </h3>
         <div className="text-ghost text-xs font-mono">Run a simulation to see ROI ranking.</div>
       </div>
     );

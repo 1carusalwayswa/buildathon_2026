@@ -8,16 +8,34 @@ interface Props {
   onNodeSelect: (nodeId: string) => void;
 }
 
+const CARD_TOOLTIPS: Record<string, string> = {
+  'Coverage': 'Percentage of all nodes that received the message. Higher = broader reach.',
+  'Max Depth': 'Furthest number of hops the message traveled from any seed node.',
+  'Peak Step': 'The simulation step where the most new nodes were activated at once.',
+  'Total Reached': 'Absolute count of nodes activated by the end of the simulation.',
+};
+
+function Tooltip({ text }: { text: string }) {
+  return (
+    <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 pointer-events-none
+                    invisible opacity-0 group-hover:visible group-hover:opacity-100
+                    transition-opacity duration-150">
+      <div className="bg-[#0a1628] border border-edge-hi rounded px-2.5 py-1.5 text-[11px] text-mid leading-snug shadow-lg">
+        {text}
+      </div>
+      <div className="w-2 h-2 bg-[#0a1628] border-b border-r border-edge-hi rotate-45 mx-auto -mt-1" />
+    </div>
+  );
+}
+
 export function AnalyticsPanel({ analytics, currentActivated, totalNodes, graphNodes, onNodeSelect }: Props) {
   if (!analytics) {
     return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-fore text-xs font-bold tracking-widest uppercase flex items-center gap-2">
-          <span className="text-neon">▸</span> Analytics
-        </h3>
         <div className="grid grid-cols-2 gap-2">
-          {['Coverage', 'Max Depth', 'Peak Step', 'Total Reached'].map((label) => (
-            <div key={label} className="bg-card border border-edge rounded p-3">
+          {Object.keys(CARD_TOOLTIPS).map((label) => (
+            <div key={label} className="relative group bg-card border border-edge rounded p-3 cursor-default">
+              <Tooltip text={CARD_TOOLTIPS[label]} />
               <div className="text-dim text-xs font-mono uppercase tracking-wide">{label}</div>
               <div className="text-ghost text-xl font-bold font-mono mt-1">—</div>
             </div>
@@ -38,13 +56,10 @@ export function AnalyticsPanel({ analytics, currentActivated, totalNodes, graphN
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-fore text-xs font-bold tracking-widest uppercase flex items-center gap-2">
-        <span className="text-neon">▸</span> Analytics
-      </h3>
-
       <div className="grid grid-cols-2 gap-2">
         {cards.map((card) => (
-          <div key={card.label} className="bg-card border border-edge rounded p-3 hover:border-edge-hi transition-colors">
+          <div key={card.label} className="relative group bg-card border border-edge rounded p-3 hover:border-edge-hi transition-colors cursor-default overflow-visible">
+            <Tooltip text={CARD_TOOLTIPS[card.label]} />
             <div className="text-dim text-xs font-mono uppercase tracking-wide">{card.label}</div>
             <div className="text-fore text-xl font-bold font-mono mt-1">{card.value}</div>
             <div className="text-ghost text-xs mt-0.5">{card.sub}</div>
@@ -53,7 +68,18 @@ export function AnalyticsPanel({ analytics, currentActivated, totalNodes, graphN
       </div>
 
       <div>
-        <div className="text-dim text-xs font-mono uppercase tracking-wide mb-2">Community Penetration</div>
+        <div className="relative group inline-flex items-center gap-1 mb-2 cursor-default">
+          <div className="text-dim text-xs font-mono uppercase tracking-wide">Community Penetration</div>
+          <span className="text-ghost text-[10px]">ⓘ</span>
+          <div className="absolute z-50 bottom-full left-0 mb-2 w-52 pointer-events-none
+                          invisible opacity-0 group-hover:visible group-hover:opacity-100
+                          transition-opacity duration-150">
+            <div className="bg-[#0a1628] border border-edge-hi rounded px-2.5 py-1.5 text-[11px] text-mid leading-snug shadow-lg">
+              Percentage of each community's nodes that were activated. Shows which audience segments the campaign reached.
+            </div>
+            <div className="w-2 h-2 bg-[#0a1628] border-b border-r border-edge-hi rotate-45 ml-3 -mt-1" />
+          </div>
+        </div>
         {Object.entries(analytics.community_penetration).map(([comm, pct]) => (
           <div key={comm} className="flex items-center gap-2 mb-1.5">
             <span className="text-mid text-xs capitalize w-16 font-mono">{comm}</span>
@@ -74,7 +100,18 @@ export function AnalyticsPanel({ analytics, currentActivated, totalNodes, graphN
 
       {analytics.bottleneck_nodes.length > 0 && (
         <div>
-          <div className="text-dim text-xs font-mono uppercase tracking-wide mb-1.5">Bottleneck Nodes</div>
+          <div className="relative group inline-flex items-center gap-1 mb-1.5 cursor-default">
+            <div className="text-dim text-xs font-mono uppercase tracking-wide">Bottleneck Nodes</div>
+            <span className="text-ghost text-[10px]">ⓘ</span>
+            <div className="absolute z-50 bottom-full left-0 mb-2 w-52 pointer-events-none
+                            invisible opacity-0 group-hover:visible group-hover:opacity-100
+                            transition-opacity duration-150">
+              <div className="bg-[#0a1628] border border-edge-hi rounded px-2.5 py-1.5 text-[11px] text-mid leading-snug shadow-lg">
+                Nodes that bridge multiple communities. Removing them would significantly reduce information spread.
+              </div>
+              <div className="w-2 h-2 bg-[#0a1628] border-b border-r border-edge-hi rotate-45 ml-3 -mt-1" />
+            </div>
+          </div>
           <div className="flex flex-wrap gap-1">
             {analytics.bottleneck_nodes.map((nodeId) => {
               const n = graphNodes.find((g) => g.id === nodeId);
