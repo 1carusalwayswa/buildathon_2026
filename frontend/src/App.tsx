@@ -38,6 +38,15 @@ export default function App() {
   const toggleSection = (key: keyof typeof expanded) =>
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const handleModeSwitch = useCallback((mode: 'campaign' | 'event') => {
+    if (mode === simMode) return;
+    setSimMode(mode);
+    setSimResult(null);
+    setEventResult(null);
+    setLayer('global');
+    setSelectedNodeId(null);
+  }, [simMode]);
+
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
@@ -276,7 +285,7 @@ export default function App() {
                           {(['campaign', 'event'] as const).map((mode) => (
                             <button
                               key={mode}
-                              onClick={() => setSimMode(mode)}
+                              onClick={() => handleModeSwitch(mode)}
                               className={`flex-1 py-1 text-[10px] font-bold tracking-widest uppercase rounded border transition-colors ${
                                 simMode === mode
                                   ? 'text-sig border-sig/60 bg-sig/10'
